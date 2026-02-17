@@ -1,0 +1,498 @@
+﻿{
+    "schema":  "via.mcp.store-registry.v1",
+    "updated":  "2026-02-17T16:07:07+08:00",
+    "stores":  [
+                   {
+                       "id":  "allbirds",
+                       "name":  "Allbirds",
+                       "category":  "Sneakers",
+                       "domain":  "allbirds.com",
+                       "mcpUrl":  "https://allbirds.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "filling-pieces",
+                       "name":  "Filling Pieces",
+                       "category":  "Sneakers",
+                       "domain":  "fillingpieces.com",
+                       "mcpUrl":  "https://fillingpieces.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "frankie4",
+                       "name":  "Frankie4",
+                       "category":  "Sneakers",
+                       "domain":  "frankie4.com.au",
+                       "mcpUrl":  "https://frankie4.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "freda-salvador",
+                       "name":  "Freda Salvador",
+                       "category":  "Sneakers",
+                       "domain":  "fredasalvador.com",
+                       "mcpUrl":  "https://fredasalvador.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "greats",
+                       "name":  "Greats",
+                       "category":  "Sneakers",
+                       "domain":  "greats.com",
+                       "mcpUrl":  "https://greats.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "morjas",
+                       "name":  "Morjas",
+                       "category":  "Sneakers",
+                       "domain":  "morjas.com",
+                       "mcpUrl":  "https://morjas.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "nisolo",
+                       "name":  "Nisolo",
+                       "category":  "Sneakers",
+                       "domain":  "nisolo.com",
+                       "mcpUrl":  "https://nisolo.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "public-rec",
+                       "name":  "Public Rec",
+                       "category":  "Sneakers",
+                       "domain":  "publicrec.com",
+                       "mcpUrl":  "https://publicrec.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "suavs",
+                       "name":  "Suavs",
+                       "category":  "Sneakers",
+                       "domain":  "suavs.com",
+                       "mcpUrl":  "https://suavs.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "thousand-fell",
+                       "name":  "Thousand Fell",
+                       "category":  "Sneakers",
+                       "domain":  "thousandfell.com",
+                       "mcpUrl":  "https://thousandfell.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "tropicfeel",
+                       "name":  "Tropicfeel",
+                       "category":  "Sneakers",
+                       "domain":  "tropicfeel.com",
+                       "mcpUrl":  "https://tropicfeel.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "unseen-footwear",
+                       "name":  "Unseen Footwear",
+                       "category":  "Sneakers",
+                       "domain":  "unseenfootwear.com",
+                       "mcpUrl":  "https://unseenfootwear.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "biolite",
+                       "name":  "BioLite",
+                       "category":  "Outdoor",
+                       "domain":  "bioliteenergy.com",
+                       "mcpUrl":  "https://bioliteenergy.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "cotopaxi",
+                       "name":  "Cotopaxi",
+                       "category":  "Outdoor",
+                       "domain":  "cotopaxi.com",
+                       "mcpUrl":  "https://cotopaxi.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "flylow",
+                       "name":  "Flylow",
+                       "category":  "Outdoor",
+                       "domain":  "flylowgear.com",
+                       "mcpUrl":  "https://flylowgear.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "matador",
+                       "name":  "Matador",
+                       "category":  "Outdoor",
+                       "domain":  "matadorup.com",
+                       "mcpUrl":  "https://matadorup.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "nemo-equipment",
+                       "name":  "Nemo Equipment",
+                       "category":  "Outdoor",
+                       "domain":  "nemoequipment.com",
+                       "mcpUrl":  "https://nemoequipment.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "parks-project",
+                       "name":  "Parks Project",
+                       "category":  "Outdoor",
+                       "domain":  "parksproject.us",
+                       "mcpUrl":  "https://parksproject.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "toad-and-co",
+                       "name":  "Toad and Co",
+                       "category":  "Outdoor",
+                       "domain":  "toadandco.com",
+                       "mcpUrl":  "https://toadandco.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "topo-designs",
+                       "name":  "Topo Designs",
+                       "category":  "Outdoor",
+                       "domain":  "topodesigns.com",
+                       "mcpUrl":  "https://topodesigns.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "voormi",
+                       "name":  "Voormi",
+                       "category":  "Outdoor",
+                       "domain":  "voormi.com",
+                       "mcpUrl":  "https://voormi.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "zpacks",
+                       "name":  "Zpacks",
+                       "category":  "Outdoor",
+                       "domain":  "zpacks.com",
+                       "mcpUrl":  "https://zpacks.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "apres-velo",
+                       "name":  "Apres Velo",
+                       "category":  "Cycling",
+                       "domain":  "apresvelo.com",
+                       "mcpUrl":  "https://apresvelo.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "cafe-du-cycliste",
+                       "name":  "Cafe du Cycliste",
+                       "category":  "Cycling",
+                       "domain":  "cafeducycliste.com",
+                       "mcpUrl":  "https://cafeducycliste.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "capo-cycling",
+                       "name":  "Capo Cycling",
+                       "category":  "Cycling",
+                       "domain":  "capocycling.com",
+                       "mcpUrl":  "https://capocycling.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "defeet",
+                       "name":  "DeFeet",
+                       "category":  "Cycling",
+                       "domain":  "defeet.com",
+                       "mcpUrl":  "https://defeet.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "isadore",
+                       "name":  "Isadore",
+                       "category":  "Cycling",
+                       "domain":  "isadore.com",
+                       "mcpUrl":  "https://isadore.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "le-col",
+                       "name":  "Le Col",
+                       "category":  "Cycling",
+                       "domain":  "lecol.cc",
+                       "mcpUrl":  "https://lecol.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "pas-normal-studios",
+                       "name":  "Pas Normal Studios",
+                       "category":  "Cycling",
+                       "domain":  "pasnormalstudios.com",
+                       "mcpUrl":  "https://pasnormalstudios.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "pearl-izumi",
+                       "name":  "Pearl Izumi",
+                       "category":  "Cycling",
+                       "domain":  "pearlizumi.com",
+                       "mcpUrl":  "https://pearlizumi.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "pedal-mafia",
+                       "name":  "Pedal Mafia",
+                       "category":  "Cycling",
+                       "domain":  "pedalmafia.com",
+                       "mcpUrl":  "https://pedalmafia.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "swiftwick",
+                       "name":  "Swiftwick",
+                       "category":  "Cycling",
+                       "domain":  "swiftwick.com",
+                       "mcpUrl":  "https://swiftwick.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "bark-avenue",
+                       "name":  "Bark Avenue",
+                       "category":  "Pet",
+                       "domain":  "barkavenue.com",
+                       "mcpUrl":  "https://barkavenue.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "bowl-and-bone",
+                       "name":  "Bowl and Bone",
+                       "category":  "Pet",
+                       "domain":  "bowlandbone.com",
+                       "mcpUrl":  "https://bowlandbone.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "found-my-animal",
+                       "name":  "Found My Animal",
+                       "category":  "Pet",
+                       "domain":  "foundmyanimal.com",
+                       "mcpUrl":  "https://foundmyanimal.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "harry-barker",
+                       "name":  "Harry Barker",
+                       "category":  "Pet",
+                       "domain":  "harrybarker.com",
+                       "mcpUrl":  "https://harrybarker.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "heads-up-for-tails",
+                       "name":  "Heads Up For Tails",
+                       "category":  "Pet",
+                       "domain":  "headsupfortails.com",
+                       "mcpUrl":  "https://headsupfortails.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "max-bone",
+                       "name":  "Max-Bone",
+                       "category":  "Pet",
+                       "domain":  "max-bone.com",
+                       "mcpUrl":  "https://max-bone.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "ruffwear",
+                       "name":  "Ruffwear",
+                       "category":  "Pet",
+                       "domain":  "ruffwear.com",
+                       "mcpUrl":  "https://ruffwear.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "the-farmer-s-dog",
+                       "name":  "The Farmer\u0027s Dog",
+                       "category":  "Pet",
+                       "domain":  "thefarmersdog.com",
+                       "mcpUrl":  "https://thefarmersdog.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   },
+                   {
+                       "id":  "west-paw",
+                       "name":  "West Paw",
+                       "category":  "Pet",
+                       "domain":  "westpaw.com",
+                       "mcpUrl":  "https://westpaw.myshopify.com/api/mcp",
+                       "enabled":  true,
+                       "weight":  100,
+                       "tags":  [
+
+                                ]
+                   }
+               ]
+}
