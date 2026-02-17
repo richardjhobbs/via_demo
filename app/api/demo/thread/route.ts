@@ -6,13 +6,13 @@ import {
   type Mode,
   type Offer,
   classifyIntent
-} from "./_lib/demo";
+} from "../_lib/demo";
 import {
   loadStoreRegistry,
   pickStoresForCategory,
   type StoreCategory
-} from "./_lib/storeRegistry";
-import { mcpSearchProducts } from "./_lib/mcp";
+} from "../_lib/storeRegistry";
+import { mcpSearchProducts } from "../_lib/mcp";
 
 function cleanQuery(raw: string): string {
   return raw
