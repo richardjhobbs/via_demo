@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { loadStoreRegistry } from "../../_lib/storeRegistry";
-import { mcpToolsList, mcpSearchProducts } from "../../_lib/mcp";
+import { loadStoreRegistry } from "../../../_lib/storeRegistry";
+import { mcpToolsList, mcpSearchProducts } from "../../../_lib/mcp";
 
 export async function GET() {
   try {
