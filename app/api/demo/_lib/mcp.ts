@@ -95,55 +95,113 @@ function extractPayload(resultJson: any): any {
   return { text: textParts.join("\n") };
 }
 
-function firstNonEmptyString(...vals: any[]): string {
+function firstNonEmptyValue(...vals: any[]): string {
   for (const v of vals) {
     if (typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v === "number" && Number.isFinite(v)) return String(v);
   }
   return "";
+}
+
+function currencySymbol(code: string): string {
+  const c = (code || "").toUpperCase();
+  if (c === "GBP") return "£";
+  if (c === "EUR") return "€";
+  if (c === "USD") return "$";
+  if (c === "AUD") return "A$";
+  if (c === "CAD") return "C$";
+  return c ? `${c} ` : "";
+}
+
+function formatMoney(amountRaw: any, currencyCodeRaw: any): string {
+  const amountStr = firstNonEmptyValue(amountRaw);
+  if (!amountStr) return "";
+
+  const code = firstNonEmptyValue(currencyCodeRaw);
+  const sym = currencySymbol(code);
+
+  // Shopify often returns "120.00" as a string. Keep it clean.
+  const n = Number(amountStr);
+  const clean =
+    Number.isFinite(n)
+      ? (n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)).replace(/\.00$/, "")
+      : amountStr;
+
+  return `${sym}${clean}`.trim();
 }
 
 function normaliseProducts(payload: any, storeBaseUrl: string): McpProduct[] {
   const out: McpProduct[] = [];
 
-  // Accept multiple likely shapes:
-  // payload.items | payload.products | payload.results | payload.data.products
+  // Shopify MCP can return multiple shapes. Support common variants:
+  // - payload.products (array)
+  // - payload.items (array)
+  // - payload.results (array)
+  // - payload.data.products (array)
+  // - payload.data.products.nodes (array)
+  // - payload.data.items (array)
+  // - payload.result.products (array)
   const candidates =
     payload?.items ??
     payload?.products ??
     payload?.results ??
     payload?.data?.products ??
-    payload?.data ??
+    payload?.data?.items ??
+    payload?.result?.products ??
+    payload?.result?.items ??
+    payload?.data?.products?.nodes ??
+    payload?.products?.nodes ??
     payload ??
     [];
 
   const arr = Array.isArray(candidates) ? candidates : [];
 
   for (const p of arr) {
-    // Some servers wrap product inside an object
     const prod = p?.product ?? p;
 
-    const title = firstNonEmptyString(prod?.title, prod?.name);
+    const title = firstNonEmptyValue(prod?.title, prod?.name);
     if (!title) continue;
 
-    const priceText = firstNonEmptyString(
-      prod?.priceText,
-      prod?.price,
-      prod?.price_string,
-      prod?.amount,
-      prod?.priceRange?.minVariantPrice?.amount
-    );
+    // Price: handle Shopify patterns: priceRange.minVariantPrice.amount + currencyCode
+    const amount =
+      prod?.priceRange?.minVariantPrice?.amount ??
+      prod?.price_range?.min_variant_price?.amount ??
+      prod?.price?.amount ??
+      prod?.amount ??
+      prod?.price;
 
-    const imageUrl = firstNonEmptyString(
+    const currencyCode =
+      prod?.priceRange?.minVariantPrice?.currencyCode ??
+      prod?.price_range?.min_variant_price?.currency_code ??
+      prod?.price?.currencyCode ??
+      prod?.currencyCode ??
+      prod?.currency_code;
+
+    const priceText =
+      firstNonEmptyValue(prod?.priceText, prod?.price_string) || formatMoney(amount, currencyCode);
+
+    // Image: handle common Shopify fields including edges/nodes
+    const imageUrl = firstNonEmptyValue(
       prod?.imageUrl,
       prod?.image,
       prod?.image_url,
       prod?.featuredImage?.url,
       prod?.featured_image?.url,
-      prod?.images?.[0]?.url
+      prod?.images?.[0]?.url,
+      prod?.images?.edges?.[0]?.node?.url,
+      prod?.media?.edges?.[0]?.node?.previewImage?.url
     );
 
-    let productUrl = firstNonEmptyString(prod?.productUrl, prod?.url, prod?.product_url);
-    const handle = firstNonEmptyString(prod?.handle);
+    // URL: Shopify often provides onlineStoreUrl
+    let productUrl = firstNonEmptyValue(
+      prod?.productUrl,
+      prod?.onlineStoreUrl,
+      prod?.online_store_url,
+      prod?.url,
+      prod?.product_url
+    );
+
+    const handle = firstNonEmptyValue(prod?.handle);
 
     if (productUrl && productUrl.startsWith("/")) {
       productUrl = storeBaseUrl.replace(/\/$/, "") + productUrl;
