@@ -33,7 +33,10 @@ function normaliseCategory(raw: string): StoreCategory | null {
 
 export async function loadStoreRegistry(): Promise<StoreEntry[]> {
   const file = path.join(process.cwd(), "data", "mcp_stores.json");
-  const txt = await fs.readFile(file, "utf-8");
+  let txt = await fs.readFile(file, "utf-8");
+// Strip UTF-8 BOM if present
+txt = txt.replace(/^\uFEFF/, "");
+
   const json = JSON.parse(txt);
 
   const storesRaw = Array.isArray(json?.stores) ? json.stores : [];
