@@ -1,3 +1,4 @@
+// app/api/demo/_lib/mcp.ts
 
 type JsonRpcReq = {
   jsonrpc: "2.0";
@@ -33,7 +34,11 @@ async function mcpPost(mcpUrl: string, req: JsonRpcReq, timeoutMs: number) {
 }
 
 export async function mcpToolsList(mcpUrl: string, timeoutMs = 6000) {
-  const r = await mcpPost(mcpUrl, { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }, timeoutMs);
+  const r = await mcpPost(
+    mcpUrl,
+    { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} },
+    timeoutMs
+  );
   if (!r.ok || !r.json?.result?.tools) return [];
   return r.json.result.tools as Array<{ name: string; description?: string; inputSchema?: any }>;
 }
@@ -59,19 +64,37 @@ export type McpProduct = {
 };
 
 function safeJsonParse(text: string): any | null {
-  try { return JSON.parse(text); } catch { return null; }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
-function extractPayload(resultJson: any): any {
-  const content = resultJson?.result?.content;
-  if (!Array.isArray(content) || content.length === 0) return resultJson;
+/**
+ * Shopify Storefront MCP tools/call responses are JSON-RPC like:
+ * { jsonrpc:"2.0", id:1, result: { content:[{type:"text", text:"{...json...}"}], isError?:boolean } }
+ *
+ * Some servers (or wrappers) may return:
+ * { content:[...], isError:true }
+ */
+function extractPayload(anyJson: any): any {
+  const container = anyJson?.result ?? anyJson; // tolerate both shapes
+  const content = container?.content;
 
+  if (!Array.isArray(content) || content.length === 0) return container;
+
+  // Prefer explicit JSON blocks if present
+  const jsonBlocks = content.filter((c: any) => c && (c.type === "json" || c.type === "application/json"));
+  if (jsonBlocks.length && jsonBlocks[0]?.json) return jsonBlocks[0].json;
+
+  // Shopify MCP usually returns JSON encoded inside a text block
   const textParts = content
     .filter((c: any) => c && typeof c.text === "string")
     .map((c: any) => c.text.trim())
     .filter(Boolean);
 
-  if (!textParts.length) return resultJson;
+  if (!textParts.length) return container;
 
   const maybe = safeJsonParse(textParts[0]);
   if (maybe) return maybe;
@@ -86,67 +109,47 @@ function firstNonEmptyString(...vals: any[]): string {
   return "";
 }
 
-function firstNonEmptyScalar(...vals: any[]): string {
-  for (const v of vals) {
-    if (typeof v === "string" && v.trim()) return v.trim();
-    if (typeof v === "number" && Number.isFinite(v)) return String(v);
-  }
-  return "";
-}
-
-function getMaybeAmount(x: any): string {
-  if (!x) return "";
-  if (typeof x === "string" || typeof x === "number") return firstNonEmptyScalar(x);
-  if (typeof x === "object") return firstNonEmptyScalar(x.amount, x.value, x.min, x.max);
-  return "";
-}
-
-function getMaybeCurrency(x: any): string {
-  if (!x) return "";
-  if (typeof x === "string") return x.trim();
-  if (typeof x === "object") return firstNonEmptyString(x.currencyCode, x.currency_code, x.code);
-  return "";
-}
-
-function currencySymbol(code: string): string {
+function toCurrencySymbol(code: string): string {
   const c = (code || "").toUpperCase();
   if (c === "GBP") return "£";
   if (c === "EUR") return "€";
   if (c === "USD") return "$";
-  if (c === "AUD") return "A$";
-  if (c === "CAD") return "C$";
-  return c ? `${c} ` : "";
+  return ""; // fallback to "CODE " prefix
 }
 
-function formatMoney(amountRaw: any, currencyRaw: any): string {
-  const amountStr = getMaybeAmount(amountRaw);
-  if (!amountStr) return "";
+function formatPrice(amountRaw: any, currencyRaw: any): string {
+  const currency = String(currencyRaw || "").toUpperCase().trim();
 
-  const code = getMaybeCurrency(currencyRaw);
-  const sym = currencySymbol(code);
+  const num =
+    typeof amountRaw === "number"
+      ? amountRaw
+      : typeof amountRaw === "string"
+        ? Number(amountRaw)
+        : NaN;
 
-  const n = Number(amountStr);
-  const clean =
-    Number.isFinite(n)
-      ? (n % 1 === 0 ? n.toFixed(0) : n.toFixed(2)).replace(/\.00$/, "")
-      : amountStr;
+  if (!Number.isFinite(num)) return "";
 
-  return `${sym}${clean}`.trim();
+  // Shopify often returns "28.0" etc. Keep 2dp only if needed.
+  const isInt = Math.abs(num - Math.round(num)) < 1e-9;
+  const amountStr = isInt ? String(Math.round(num)) : num.toFixed(2);
+
+  const sym = toCurrencySymbol(currency);
+  if (sym) return `${sym}${amountStr}`;
+  if (currency) return `${currency} ${amountStr}`;
+  return amountStr;
 }
 
 function normaliseProducts(payload: any, storeBaseUrl: string): McpProduct[] {
   const out: McpProduct[] = [];
 
+  // Shopify MCP shape: { products:[...] }
+  // Keep a few alternates for other MCPs.
   const candidates =
-    payload?.items ??
     payload?.products ??
+    payload?.items ??
     payload?.results ??
     payload?.data?.products ??
-    payload?.data?.items ??
-    payload?.result?.products ??
-    payload?.result?.items ??
-    payload?.data?.products?.nodes ??
-    payload?.products?.nodes ??
+    payload?.data ??
     payload ??
     [];
 
@@ -158,49 +161,41 @@ function normaliseProducts(payload: any, storeBaseUrl: string): McpProduct[] {
     const title = firstNonEmptyString(prod?.title, prod?.name);
     if (!title) continue;
 
-    const priceRangeMin = prod?.priceRange?.minVariantPrice ?? prod?.price_range?.min_variant_price;
+    // --- PRICE (Shopify MCP) ---
+    // Primary: price_range.min + price_range.currency
+    const prMin = prod?.price_range?.min;
+    const prCur = prod?.price_range?.currency;
 
-    const amount =
-      prod?.priceText ??
-      prod?.price_string ??
-      prod?.price ??
-      prod?.amount ??
-      priceRangeMin?.amount ??
-      prod?.priceV2?.amount ??
-      prod?.variants?.[0]?.price ??
-      prod?.variants?.[0]?.priceV2?.amount;
+    // Secondary: first variant price/currency
+    const v0 = Array.isArray(prod?.variants) ? prod.variants[0] : null;
+    const vPrice = v0?.price;
+    const vCur = v0?.currency;
 
-    const currency =
-      priceRangeMin?.currencyCode ??
-      prod?.currencyCode ??
-      prod?.currency_code ??
-      prod?.priceV2?.currencyCode ??
-      prod?.variants?.[0]?.priceV2?.currencyCode;
+    // Tertiary: any other known shapes (keep what you already attempted)
+    const gqlAmount = prod?.priceRange?.minVariantPrice?.amount;
+    const gqlCur = prod?.priceRange?.minVariantPrice?.currencyCode;
 
     const priceText =
-      (typeof amount === "string" && amount.trim() && amount.trim().match(/[£$€A-Z]/i))
-        ? amount.trim()
-        : firstNonEmptyString(prod?.priceText, prod?.price_string) || formatMoney(amount, currency);
+      formatPrice(prMin, prCur) ||
+      formatPrice(vPrice, vCur) ||
+      formatPrice(gqlAmount, gqlCur) ||
+      firstNonEmptyString(prod?.priceText, prod?.price, prod?.price_string, prod?.amount);
 
-    const imageUrl = firstNonEmptyString(
-      prod?.imageUrl,
-      prod?.image,
-      prod?.image_url,
-      prod?.featuredImage?.url,
-      prod?.featured_image?.url,
-      prod?.images?.[0]?.url,
-      prod?.images?.edges?.[0]?.node?.url,
-      prod?.media?.edges?.[0]?.node?.previewImage?.url
-    );
+    // --- IMAGE (Shopify MCP uses image_url) ---
+    const imageUrl =
+      firstNonEmptyString(
+        prod?.image_url,
+        prod?.imageUrl,
+        prod?.image,
+        prod?.image_url,
+        prod?.featuredImage?.url,
+        prod?.featured_image?.url,
+        prod?.images?.[0]?.url,
+        v0?.image_url
+      ) || "";
 
-    let productUrl = firstNonEmptyString(
-      prod?.productUrl,
-      prod?.onlineStoreUrl,
-      prod?.online_store_url,
-      prod?.url,
-      prod?.product_url
-    );
-
+    // --- URL (Shopify MCP uses url) ---
+    let productUrl = firstNonEmptyString(prod?.url, prod?.productUrl, prod?.product_url);
     const handle = firstNonEmptyString(prod?.handle);
 
     if (productUrl && productUrl.startsWith("/")) productUrl = storeBaseUrl.replace(/\/$/, "") + productUrl;
@@ -212,7 +207,7 @@ function normaliseProducts(payload: any, storeBaseUrl: string): McpProduct[] {
     out.push({
       title,
       priceText: priceText || "",
-      imageUrl: imageUrl || "",
+      imageUrl,
       productUrl
     });
   }
@@ -226,7 +221,7 @@ export async function mcpSearchProducts(opts: {
   query: string;
   timeoutMs?: number;
 }): Promise<{ ok: boolean; products: McpProduct[]; toolUsed?: string; error?: string }> {
-  const timeoutMs = opts.timeoutMs ?? 9000;
+  const timeoutMs = opts.timeoutMs ?? 12000;
 
   const tools = await mcpToolsList(opts.mcpUrl, timeoutMs);
   if (!tools.length) return { ok: false, products: [], error: "No tools/list response" };
@@ -234,28 +229,37 @@ export async function mcpSearchProducts(opts: {
   const toolName = pickSearchTool(tools);
   if (!toolName) return { ok: false, products: [], error: "No search tool found" };
 
-  const callReq: JsonRpcReq = {
-    jsonrpc: "2.0",
-    id: 2,
-    method: "tools/call",
-    params: {
-      name: toolName,
-      arguments: {
-        query: opts.query,
-        context: "Return relevant products with price and image. Prefer in-stock items."
-      }
-    }
-  };
+  // Shopify docs: both query + context are required for search_shop_catalog. :contentReference[oaicite:1]{index=1}
+  const context = "Customer is shopping and wants relevant in-stock options with clear pricing.";
 
-  const r = await mcpPost(opts.mcpUrl, callReq, timeoutMs);
-  if (!r.ok || !r.json) return { ok: false, products: [], toolUsed: toolName, error: "Search call failed" };
+  // Keep multiple argument shapes, but ALWAYS include context for Shopify MCP.
+  const attempts = [
+    { query: opts.query, context, limit: 10 },
+    { query: opts.query, context, first: 10 },
+    { query: opts.query, context, count: 10 },
+    { q: opts.query, context, limit: 10 }
+  ];
 
-  const payload = extractPayload(r.json);
-  const products = normaliseProducts(payload, opts.storeBaseUrl);
+  for (const args of attempts) {
+    const callReq: JsonRpcReq = {
+      jsonrpc: "2.0",
+      id: 2,
+      method: "tools/call",
+      params: { name: toolName, arguments: args }
+    };
 
-  if (products.length) {
-    return { ok: true, products, toolUsed: toolName };
+    const r = await mcpPost(opts.mcpUrl, callReq, timeoutMs);
+    if (!r.ok || !r.json) continue;
+
+    const payload = extractPayload(r.json);
+
+    // If MCP marks error, don’t treat as success.
+    const container = r.json?.result ?? r.json;
+    if (container?.isError) continue;
+
+    const products = normaliseProducts(payload, opts.storeBaseUrl);
+    if (products.length) return { ok: true, products, toolUsed: toolName };
   }
 
-  return { ok: false, products: [], toolUsed: toolName, error: "No usable products returned" };
+  return { ok: false, products: [], toolUsed: toolName, error: "Search returned no products" };
 }
