@@ -1,4 +1,3 @@
-// app/api/demo/_lib/mcp.ts
 
 type JsonRpcReq = {
   jsonrpc: "2.0";
@@ -34,26 +33,19 @@ async function mcpPost(mcpUrl: string, req: JsonRpcReq, timeoutMs: number) {
 }
 
 export async function mcpToolsList(mcpUrl: string, timeoutMs = 6000) {
-  const r = await mcpPost(
-    mcpUrl,
-    { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} },
-    timeoutMs
-  );
-
+  const r = await mcpPost(mcpUrl, { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }, timeoutMs);
   if (!r.ok || !r.json?.result?.tools) return [];
   return r.json.result.tools as Array<{ name: string; description?: string; inputSchema?: any }>;
 }
 
 function pickSearchTool(tools: Array<{ name: string }>) {
-  const names = tools.map((t) => t.name);
-
-  // Shopify Storefront MCP
+  const names = tools.map(t => t.name);
   if (names.includes("search_shop_catalog")) return "search_shop_catalog";
 
-  const strong = names.find((n) => /search/i.test(n) && /(catalog|product|products|shop)/i.test(n));
+  const strong = names.find(n => /search/i.test(n) && /(catalog|product|products|shop)/i.test(n));
   if (strong) return strong;
 
-  const anySearch = names.find((n) => /search/i.test(n));
+  const anySearch = names.find(n => /search/i.test(n));
   if (anySearch) return anySearch;
 
   return null;
@@ -67,16 +59,10 @@ export type McpProduct = {
 };
 
 function safeJsonParse(text: string): any | null {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(text); } catch { return null; }
 }
 
 function extractPayload(resultJson: any): any {
-  // Typical MCP tools/call format:
-  // { result: { content: [{ type:"text", text:"..." }, ...] } }
   const content = resultJson?.result?.content;
   if (!Array.isArray(content) || content.length === 0) return resultJson;
 
@@ -87,19 +73,38 @@ function extractPayload(resultJson: any): any {
 
   if (!textParts.length) return resultJson;
 
-  // Often the first text block is JSON
   const maybe = safeJsonParse(textParts[0]);
   if (maybe) return maybe;
 
-  // Otherwise keep as text
   return { text: textParts.join("\n") };
 }
 
-function firstNonEmptyValue(...vals: any[]): string {
+function firstNonEmptyString(...vals: any[]): string {
+  for (const v of vals) {
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+function firstNonEmptyScalar(...vals: any[]): string {
   for (const v of vals) {
     if (typeof v === "string" && v.trim()) return v.trim();
     if (typeof v === "number" && Number.isFinite(v)) return String(v);
   }
+  return "";
+}
+
+function getMaybeAmount(x: any): string {
+  if (!x) return "";
+  if (typeof x === "string" || typeof x === "number") return firstNonEmptyScalar(x);
+  if (typeof x === "object") return firstNonEmptyScalar(x.amount, x.value, x.min, x.max);
+  return "";
+}
+
+function getMaybeCurrency(x: any): string {
+  if (!x) return "";
+  if (typeof x === "string") return x.trim();
+  if (typeof x === "object") return firstNonEmptyString(x.currencyCode, x.currency_code, x.code);
   return "";
 }
 
@@ -113,14 +118,13 @@ function currencySymbol(code: string): string {
   return c ? `${c} ` : "";
 }
 
-function formatMoney(amountRaw: any, currencyCodeRaw: any): string {
-  const amountStr = firstNonEmptyValue(amountRaw);
+function formatMoney(amountRaw: any, currencyRaw: any): string {
+  const amountStr = getMaybeAmount(amountRaw);
   if (!amountStr) return "";
 
-  const code = firstNonEmptyValue(currencyCodeRaw);
+  const code = getMaybeCurrency(currencyRaw);
   const sym = currencySymbol(code);
 
-  // Shopify often returns "120.00" as a string. Keep it clean.
   const n = Number(amountStr);
   const clean =
     Number.isFinite(n)
@@ -133,14 +137,6 @@ function formatMoney(amountRaw: any, currencyCodeRaw: any): string {
 function normaliseProducts(payload: any, storeBaseUrl: string): McpProduct[] {
   const out: McpProduct[] = [];
 
-  // Shopify MCP can return multiple shapes. Support common variants:
-  // - payload.products (array)
-  // - payload.items (array)
-  // - payload.results (array)
-  // - payload.data.products (array)
-  // - payload.data.products.nodes (array)
-  // - payload.data.items (array)
-  // - payload.result.products (array)
   const candidates =
     payload?.items ??
     payload?.products ??
@@ -159,29 +155,34 @@ function normaliseProducts(payload: any, storeBaseUrl: string): McpProduct[] {
   for (const p of arr) {
     const prod = p?.product ?? p;
 
-    const title = firstNonEmptyValue(prod?.title, prod?.name);
+    const title = firstNonEmptyString(prod?.title, prod?.name);
     if (!title) continue;
 
-    // Price: handle Shopify patterns: priceRange.minVariantPrice.amount + currencyCode
-    const amount =
-      prod?.priceRange?.minVariantPrice?.amount ??
-      prod?.price_range?.min_variant_price?.amount ??
-      prod?.price?.amount ??
-      prod?.amount ??
-      prod?.price;
+    const priceRangeMin = prod?.priceRange?.minVariantPrice ?? prod?.price_range?.min_variant_price;
 
-    const currencyCode =
-      prod?.priceRange?.minVariantPrice?.currencyCode ??
-      prod?.price_range?.min_variant_price?.currency_code ??
-      prod?.price?.currencyCode ??
+    const amount =
+      prod?.priceText ??
+      prod?.price_string ??
+      prod?.price ??
+      prod?.amount ??
+      priceRangeMin?.amount ??
+      prod?.priceV2?.amount ??
+      prod?.variants?.[0]?.price ??
+      prod?.variants?.[0]?.priceV2?.amount;
+
+    const currency =
+      priceRangeMin?.currencyCode ??
       prod?.currencyCode ??
-      prod?.currency_code;
+      prod?.currency_code ??
+      prod?.priceV2?.currencyCode ??
+      prod?.variants?.[0]?.priceV2?.currencyCode;
 
     const priceText =
-      firstNonEmptyValue(prod?.priceText, prod?.price_string) || formatMoney(amount, currencyCode);
+      (typeof amount === "string" && amount.trim() && amount.trim().match(/[£$€A-Z]/i))
+        ? amount.trim()
+        : firstNonEmptyString(prod?.priceText, prod?.price_string) || formatMoney(amount, currency);
 
-    // Image: handle common Shopify fields including edges/nodes
-    const imageUrl = firstNonEmptyValue(
+    const imageUrl = firstNonEmptyString(
       prod?.imageUrl,
       prod?.image,
       prod?.image_url,
@@ -192,8 +193,7 @@ function normaliseProducts(payload: any, storeBaseUrl: string): McpProduct[] {
       prod?.media?.edges?.[0]?.node?.previewImage?.url
     );
 
-    // URL: Shopify often provides onlineStoreUrl
-    let productUrl = firstNonEmptyValue(
+    let productUrl = firstNonEmptyString(
       prod?.productUrl,
       prod?.onlineStoreUrl,
       prod?.online_store_url,
@@ -201,19 +201,13 @@ function normaliseProducts(payload: any, storeBaseUrl: string): McpProduct[] {
       prod?.product_url
     );
 
-    const handle = firstNonEmptyValue(prod?.handle);
+    const handle = firstNonEmptyString(prod?.handle);
 
-    if (productUrl && productUrl.startsWith("/")) {
-      productUrl = storeBaseUrl.replace(/\/$/, "") + productUrl;
-    }
-
+    if (productUrl && productUrl.startsWith("/")) productUrl = storeBaseUrl.replace(/\/$/, "") + productUrl;
     if ((!productUrl || !productUrl.startsWith("http")) && handle) {
       productUrl = storeBaseUrl.replace(/\/$/, "") + "/products/" + handle;
     }
-
-    if (!productUrl || !productUrl.startsWith("http")) {
-      productUrl = storeBaseUrl;
-    }
+    if (!productUrl || !productUrl.startsWith("http")) productUrl = storeBaseUrl;
 
     out.push({
       title,
@@ -235,18 +229,10 @@ export async function mcpSearchProducts(opts: {
   const timeoutMs = opts.timeoutMs ?? 9000;
 
   const tools = await mcpToolsList(opts.mcpUrl, timeoutMs);
-  if (!tools.length) {
-    return { ok: false, products: [], error: "No tools/list response" };
-  }
+  if (!tools.length) return { ok: false, products: [], error: "No tools/list response" };
 
   const toolName = pickSearchTool(tools);
-  if (!toolName) {
-    return { ok: false, products: [], error: "No search tool found" };
-  }
-
-  // Shopify Storefront MCP expects BOTH query and context as required fields.
-  const context =
-    "Customer is shopping online. Return relevant products with price and image. Prefer in-stock items.";
+  if (!toolName) return { ok: false, products: [], error: "No search tool found" };
 
   const callReq: JsonRpcReq = {
     jsonrpc: "2.0",
@@ -256,23 +242,20 @@ export async function mcpSearchProducts(opts: {
       name: toolName,
       arguments: {
         query: opts.query,
-        context
+        context: "Return relevant products with price and image. Prefer in-stock items."
       }
     }
   };
 
   const r = await mcpPost(opts.mcpUrl, callReq, timeoutMs);
-
-  if (!r.ok || !r.json) {
-    return { ok: false, products: [], toolUsed: toolName, error: "Search call failed" };
-  }
+  if (!r.ok || !r.json) return { ok: false, products: [], toolUsed: toolName, error: "Search call failed" };
 
   const payload = extractPayload(r.json);
   const products = normaliseProducts(payload, opts.storeBaseUrl);
 
-  if (!products.length) {
-    return { ok: false, products: [], toolUsed: toolName, error: "No usable products returned" };
+  if (products.length) {
+    return { ok: true, products, toolUsed: toolName };
   }
 
-  return { ok: true, products, toolUsed: toolName };
+  return { ok: false, products: [], toolUsed: toolName, error: "No usable products returned" };
 }
