@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Offer = {
   id: string;
@@ -38,81 +38,48 @@ type ThreadState = {
   };
   token: string;
 
-  debug?: {
-    category?: string;
-    cleanedQuery?: string;
-    storesPicked?: Array<{ name?: string; label?: string; storeId?: string } | string>;
-    toolUsed?: string;
-    productCount?: number;
-    firstProduct?: any;
-  };
+  debug?: any;
 };
 
-function nowTheme(): "light" | "dark" {
+function getInitialTheme(): "light" | "dark" {
   if (typeof window === "undefined") return "light";
   const saved = window.localStorage.getItem("via_demo_theme");
   if (saved === "dark" || saved === "light") return saved;
-  const prefersDark =
-    window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
   return prefersDark ? "dark" : "light";
 }
 
-function safeTime(ts: string) {
-  try {
-    return new Date(ts).toLocaleTimeString();
-  } catch {
-    return ts;
-  }
-}
-
-function uniqStrings(input: Array<any> | undefined | null): string[] {
-  if (!input) return [];
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const x of input) {
-    const v =
-      typeof x === "string"
-        ? x
-        : x?.label || x?.name || x?.storeId || JSON.stringify(x);
-    const s = String(v ?? "").trim();
-    if (!s) continue;
-    if (seen.has(s)) continue;
-    seen.add(s);
-    out.push(s);
-  }
-  return out;
+function applyTheme(theme: "light" | "dark") {
+  if (typeof document === "undefined") return;
+  if (theme === "dark") document.documentElement.classList.add("dark");
+  else document.documentElement.classList.remove("dark");
 }
 
 export default function HomePage() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [mode, setMode] = useState<"buyer" | "seller">("buyer");
+
+  // Right panel view selector, buttons moved to bottom of right column
+  const [rightTab, setRightTab] = useState<"offers" | "transparency" | "debug">("offers");
+
   const [requestText, setRequestText] = useState("");
   const [thread, setThread] = useState<ThreadState | null>(null);
   const [loading, setLoading] = useState(false);
   const [pollOn, setPollOn] = useState(false);
 
-  const [transparencyOn, setTransparencyOn] = useState(true);
-  const [debugOn, setDebugOn] = useState(true);
-
-  const threadStartRef = useRef<number | null>(null);
-  const offerFirstSeenRef = useRef<Record<string, number>>({});
-
   const heroSubtitle = useMemo(() => {
-    return "Live agent-to-agent commerce demo. Intent is interpreted, broadcast to merchants, responses arrive, negotiation happens, you confirm.";
+    return "Live agent-to-agent commerce demo. Intent is interpreted, broadcast to merchants, responses arrive, negotiation happens, you confirm. See all NOTES below!";
   }, []);
 
   useEffect(() => {
-    const t = nowTheme();
+    const t = getInitialTheme();
     setTheme(t);
-    if (t === "dark") document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
+    applyTheme(t);
   }, []);
 
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
     setTheme(next);
-    if (next === "dark") document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
+    applyTheme(next);
     window.localStorage.setItem("via_demo_theme", next);
   }
 
@@ -120,26 +87,7 @@ export default function HomePage() {
     setRequestText("");
     setThread(null);
     setPollOn(false);
-    setLoading(false);
-    threadStartRef.current = null;
-    offerFirstSeenRef.current = {};
-  }
-
-  function recordOfferArrivals(nextThread: ThreadState) {
-    if (!threadStartRef.current) threadStartRef.current = Date.now();
-    const now = Date.now();
-    for (const o of nextThread.offers ?? []) {
-      if (!offerFirstSeenRef.current[o.id]) offerFirstSeenRef.current[o.id] = now;
-    }
-  }
-
-  function offerAgeText(offerId: string) {
-    const start = threadStartRef.current;
-    const seen = offerFirstSeenRef.current[offerId];
-    if (!start || !seen) return "";
-    const secs = (seen - start) / 1000;
-    if (!Number.isFinite(secs)) return "";
-    return `${secs.toFixed(1)}s`;
+    setRightTab("offers");
   }
 
   async function createThread() {
@@ -148,41 +96,32 @@ export default function HomePage() {
 
     setLoading(true);
     setThread(null);
-    setPollOn(false);
-    threadStartRef.current = Date.now();
-    offerFirstSeenRef.current = {};
 
     try {
       const res = await fetch("/api/demo/thread", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestText: txt, mode, debug: debugOn })
+        body: JSON.stringify({ requestText: txt })
       });
-      if (!res.ok) throw new Error("Failed to start demo");
 
-      const data = (await res.json()) as ThreadState;
-      recordOfferArrivals(data);
+      if (!res.ok) throw new Error("Failed to start demo");
+      const data = await res.json();
       setThread(data);
       setPollOn(true);
+      setRightTab("offers");
     } finally {
       setLoading(false);
     }
   }
 
   async function pollThread(t: ThreadState) {
-    const url = debugOn
-      ? `/api/demo/thread/${t.threadId}?debug=1`
-      : `/api/demo/thread/${t.threadId}`;
-
-    const res = await fetch(url, {
+    const res = await fetch(`/api/demo/thread/${t.threadId}`, {
       cache: "no-store",
       headers: { "x-demo-token": t.token }
     });
-
     if (!res.ok) return;
 
-    const data = (await res.json()) as ThreadState;
-    recordOfferArrivals(data);
+    const data = await res.json();
     setThread(data);
 
     if ((data?.kpis?.offersCount ?? 0) >= 3) setPollOn(false);
@@ -200,6 +139,7 @@ export default function HomePage() {
   async function selectOffer(offerId: string) {
     if (!thread?.threadId) return;
     setLoading(true);
+
     try {
       const res = await fetch(`/api/demo/thread/${thread.threadId}/select-offer`, {
         method: "POST",
@@ -210,9 +150,9 @@ export default function HomePage() {
         body: JSON.stringify({ offerId })
       });
       if (!res.ok) throw new Error("Failed to select offer");
-      const data = (await res.json()) as ThreadState;
-      recordOfferArrivals(data);
+      const data = await res.json();
       setThread(data);
+      setRightTab("transparency");
     } finally {
       setLoading(false);
     }
@@ -234,8 +174,7 @@ export default function HomePage() {
         body: JSON.stringify({ text: msg })
       });
       if (!res.ok) throw new Error("Failed to send message");
-      const data = (await res.json()) as ThreadState;
-      recordOfferArrivals(data);
+      const data = await res.json();
       setThread(data);
       setPollOn(true);
     } finally {
@@ -246,14 +185,14 @@ export default function HomePage() {
   async function confirm() {
     if (!thread?.threadId) return;
     setLoading(true);
+
     try {
       const res = await fetch(`/api/demo/thread/${thread.threadId}/confirm`, {
         method: "POST",
         headers: { "x-demo-token": thread.token }
       });
       if (!res.ok) throw new Error("Failed to confirm");
-      const data = (await res.json()) as ThreadState;
-      recordOfferArrivals(data);
+      const data = await res.json();
       setThread(data);
       setPollOn(false);
     } finally {
@@ -261,312 +200,391 @@ export default function HomePage() {
     }
   }
 
-  const debugStores = uniqStrings(thread?.debug?.storesPicked);
-  const debugCategory = thread?.debug?.category || thread?.kpis?.category || "";
-  const debugQuery = thread?.debug?.cleanedQuery || "";
-  const debugTool = thread?.debug?.toolUsed || "";
+  const intentLine =
+    thread?.kpis?.category
+      ? `Detected category: ${thread.kpis.category}`
+      : "Detected category: pending";
 
-  const phaseLabel = (() => {
-    if (!thread) return "Waiting for request";
-    if (thread.kpis.confirmed) return "Confirmed";
-    if (thread.status === "AGREED") return "Ready to confirm";
-    if (thread.selectedOfferId) return "Negotiation";
-    if ((thread.kpis.offersCount ?? 0) > 0) return "Collecting responses";
-    return "Broadcasting request";
-  })();
+  const routingLine =
+    thread?.kpis?.category
+      ? `Broadcasting into ${thread.kpis.category} stores.`
+      : "Broadcasting into participating stores.";
+
+  const timeline = useMemo(() => {
+    const stage = thread?.kpis?.stageLabel?.toLowerCase() ?? "";
+    const offersCount = thread?.kpis?.offersCount ?? 0;
+    const hasOfferSelected = Boolean(thread?.selectedOfferId);
+    const confirmed = Boolean(thread?.kpis?.confirmed);
+
+    const stepStatus = (n: number) => {
+      if (!thread) return "Pending";
+      if (confirmed) return "Done";
+      if (n === 1) return "Done";
+      if (n === 2) return stage.includes("broadcast") || offersCount > 0 ? "Active" : "Pending";
+      if (n === 3) return offersCount > 0 ? (offersCount >= 3 ? "Done" : "Active") : "Pending";
+      if (n === 4) return hasOfferSelected ? "Active" : "Pending";
+      if (n === 5) return thread.status === "AGREED" ? "Active" : "Pending";
+      return "Pending";
+    };
+
+    return [
+      { n: 1, title: "Interpret intent", desc: thread ? intentLine : "Waiting for your request.", status: stepStatus(1) },
+      { n: 2, title: "Broadcast to merchants", desc: thread ? routingLine : "Waiting.", status: stepStatus(2) },
+      { n: 3, title: "Collect responses", desc: thread ? `${offersCount} offer(s) received.` : "Waiting.", status: stepStatus(3) },
+      { n: 4, title: "Negotiate", desc: thread ? (thread.selectedOfferId ? "Negotiation open on selected offer." : "Select an offer to begin.") : "Select an offer to begin.", status: stepStatus(4) },
+      { n: 5, title: "Confirm", desc: thread ? (thread.kpis.confirmed ? "Confirmed." : "Final step always requires buyer approval.") : "Final step always requires buyer approval.", status: stepStatus(5) }
+    ];
+  }, [thread, intentLine, routingLine]);
+
+  const notesText = useMemo(() => {
+    return (
+      "This is a visualization of part of what happens behind the scenes when agentic commerce takes place. " +
+      "It shows intent being distributed, and merchant agents (these are actual retail operators) offering products " +
+      "through the MCP server and NOSTR relay constructed as part of the VIA protocol.\n\n" +
+      "For the purposes of this demo, merchants and categories are restricted to:\n" +
+      "SNEAKERS\nOUTDOORS\nCYCLING\nPET SUPPLIES\n\n" +
+      "There are no pricing parameters. Feel free to test and see the process at work."
+    );
+  }, []);
+
+  // IMPORTANT: replace this with your real X URL. I am not guessing it.
+  const xUrl = "https://x.com/via_labs_sg";
 
   return (
-    <main>
-      <div className="container">
-        <div className="demo-top">
-          <h1>VIA Demo</h1>
-          <p className="subtitle">{heroSubtitle}</p>
+    <div className="container">
+      {/* Header row: logo top-left, theme toggle top-right */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginTop: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          {/* Logo linking to index on the demo site */}
+          <a href="/" aria-label="VIA Demo Home" style={{ display: "inline-flex", alignItems: "center" }}>
+            <img
+              src="/images/VIA_logo_large_black.png"
+              alt="VIA"
+              style={{ height: 34, width: "auto" }}
+            />
+          </a>
 
-          <div className="demo-controls">
-            <button
-              className={"demo-pill " + (mode === "buyer" ? "active" : "")}
-              onClick={() => setMode("buyer")}
-            >
-              Buyer view
-            </button>
-            <button
-              className={"demo-pill " + (mode === "seller" ? "active" : "")}
-              onClick={() => setMode("seller")}
-            >
-              Seller view
-            </button>
-
-            <button
-              className={"demo-pill " + (transparencyOn ? "active" : "")}
-              onClick={() => setTransparencyOn((v) => !v)}
-            >
-              Transparency
-            </button>
-
-            <button
-              className={"demo-pill " + (debugOn ? "active" : "")}
-              onClick={() => setDebugOn((v) => !v)}
-            >
-              Debug
-            </button>
-
-            <button className="demo-pill active" onClick={toggleTheme}>
-              {theme === "dark" ? "Night" : "Day"}
-            </button>
+          <div>
+            <h1 style={{ marginBottom: 6 }}>VIA DEMO</h1>
+            <p className="subtitle" style={{ marginBottom: 0 }}>{heroSubtitle}</p>
           </div>
         </div>
 
-        {/* Top 2-column layout */}
-        <div className="demo-split">
-          {/* LEFT COLUMN: Intent, Orchestration, Timeline (plus request input at the top) */}
-          <div className="card">
-            <div className="demo-section-title">
-              <h2>Request</h2>
-              <span className="demo-smalllink" onClick={resetAll}>Reset</span>
-            </div>
+        {/* Day/Night toggle top right */}
+        <button className="theme-toggle" aria-label="Toggle dark/light mode" onClick={toggleTheme}>
+          <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
 
-            <p>
-              Describe what you want. The assistant interprets intent, broadcasts to multiple merchants,
-              collects responses, negotiates, and you approve the final step.
-            </p>
+          <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+      </div>
 
-            <div style={{ height: 12 }} />
+      {/* No buttons under heading. Main sections start immediately. */}
 
-            {/* Prominent full-width input */}
-            <input
-              type="text"
+      {/* Upper two-column area */}
+      <div className="demo-split" style={{ marginTop: 18 }}>
+        {/* LEFT COLUMN */}
+        <div className="card">
+          <div className="demo-section-title">
+            <h2>Intent</h2>
+            <span className="demo-smalllink" onClick={resetAll}>Reset</span>
+          </div>
+
+          <p style={{ marginTop: 10 }}>
+            Describe what you want. The assistant interprets intent, broadcasts to multiple merchants, collects responses, negotiates, and you approve the final step.
+          </p>
+
+          <div style={{ marginTop: 12 }}>
+            <textarea
               value={requestText}
               onChange={(e) => setRequestText(e.target.value)}
-              placeholder='Try: "Cycling helmet under 80" or "Dog treats delivered this week"'
-              style={{ fontSize: 18, padding: "1rem" }}
+              placeholder='Try: "Cycling helmet size M, breathable" or "Dog treats, grain free, deliver this week"'
+              rows={6}
+              style={{ width: "100%", resize: "vertical" }}
             />
 
-            <div style={{ height: 10 }} />
-
-            <button
-              className="cta-button"
-              disabled={loading || requestText.trim().length === 0}
-              onClick={createThread}
-              style={{ fontSize: "1.05rem" }}
-            >
-              {loading ? "Working..." : "Send"}
-            </button>
-
-            <div style={{ height: 16 }} />
-
-            <div className="content-section">
-              <h3>Intent</h3>
-              <p>
-                <b>Detected category:</b> {thread ? (thread.kpis.category ?? "Unknown") : "Waiting"}
-              </p>
-              {thread ? (
-                <p style={{ opacity: 0.8 }}>
-                  <b>Current phase:</b> {phaseLabel}
-                </p>
-              ) : (
-                <p style={{ opacity: 0.8 }}>
-                  Send a request to begin routing and orchestration.
-                </p>
-              )}
-            </div>
-
-            <div className="content-section">
-              <h3>Orchestration</h3>
-              <p><b>Current phase:</b> {phaseLabel}</p>
-              <p style={{ opacity: 0.8 }}>
-                This is a live demo pulling real data from real stores to show agent coordination.
-              </p>
-            </div>
-
-            <div className="content-section">
-              <h3>Timeline</h3>
-
-              <div className="demo-item">
-                <div className="demo-meta"><span>1. Interpret intent</span><span>{thread ? "Done" : "Pending"}</span></div>
-                <div className="demo-text">
-                  {thread ? (
-                    <>
-                      Category: <b>{thread.kpis.category ?? "Unknown"}</b>
-                      {debugQuery ? <div className="demo-muted" style={{ marginTop: 6 }}>Clean query: {debugQuery}</div> : null}
-                    </>
-                  ) : (
-                    "Waiting for your request."
-                  )}
-                </div>
-              </div>
-
-              <div className="demo-item">
-                <div className="demo-meta"><span>2. Broadcast to merchants</span><span>{thread ? "Active" : "Pending"}</span></div>
-                <div className="demo-text">
-                  {thread ? (
-                    debugStores.length ? (
-                      <>
-                        Routed to: <span className="demo-muted">{debugStores.join(" , ")}</span>
-                        {debugTool ? <div className="demo-muted" style={{ marginTop: 6 }}>Tool: {debugTool}</div> : null}
-                      </>
-                    ) : (
-                      "Broadcast list not shown (debug payload not present)."
-                    )
-                  ) : (
-                    "Waiting."
-                  )}
-                </div>
-              </div>
-
-              <div className="demo-item">
-                <div className="demo-meta"><span>3. Collect responses</span><span>{thread ? `${thread.kpis.offersCount}/3` : "Pending"}</span></div>
-                <div className="demo-text">
-                  {thread ? "Seller agents respond with live products (image, URL, price when available)." : "Waiting."}
-                </div>
-              </div>
-
-              <div className="demo-item">
-                <div className="demo-meta"><span>4. Negotiate</span><span>{thread?.selectedOfferId ? "Active" : "Pending"}</span></div>
-                <div className="demo-text">
-                  {thread?.selectedOfferId ? "Negotiation happens inside the thread, with structured constraints." : "Select an offer to begin."}
-                </div>
-              </div>
-
-              <div className="demo-item">
-                <div className="demo-meta"><span>5. Confirm</span><span>{thread?.status === "AGREED" ? "Ready" : thread?.kpis?.confirmed ? "Done" : "Pending"}</span></div>
-                <div className="demo-text">
-                  {thread?.kpis?.confirmed ? "Buyer confirmed, thread complete." : "Final step always requires buyer approval."}
-                </div>
-              </div>
+            <div style={{ marginTop: 10 }}>
+              <button
+                className="cta-button"
+                disabled={loading || requestText.trim().length === 0}
+                onClick={createThread}
+                style={{ width: "100%" }}
+              >
+                {loading ? "Working..." : "Send request"}
+              </button>
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Offers + Transparency only */}
-          <div className="card">
-            <div className="demo-section-title">
-              <h2>Offers</h2>
-              <span className="demo-smalllink">Select one to negotiate</span>
-            </div>
+          <div style={{ height: 16 }} />
 
-            {!thread ? (
-              <div className="content-section">
-                <h3>No offers yet</h3>
-                <p>Send a request to broadcast to merchants and see responses arrive.</p>
+          <div className="content-section">
+            <h3>Orchestration</h3>
+            <p><b>Current phase:</b> {thread ? thread.kpis.stageLabel : "Waiting for request"}</p>
+            <p style={{ opacity: 0.8 }}>
+              This is a live demo pulling real data from real stores to show agent coordination.
+            </p>
+          </div>
+
+          <div className="content-section">
+            <h3>Timeline</h3>
+            {timeline.map((s) => (
+              <div className="demo-item" key={s.n}>
+                <div className="demo-meta">
+                  <span>{s.n}. {s.title}</span>
+                  <span>{s.status}</span>
+                </div>
+                <div className="demo-text">{s.desc}</div>
               </div>
-            ) : (
-              thread.offers.map((o) => {
-                const selected = thread.selectedOfferId === o.id;
-                const arrived = offerAgeText(o.id);
+            ))}
+          </div>
+        </div>
 
-                return (
-                  <div className={"demo-offer " + (selected ? "selected" : "")} key={o.id}>
-                    <div className="demo-offer-top">
-                      <img className="demo-offer-img" src={o.imageUrl} alt={o.headline} />
-                      <div style={{ flex: 1 }}>
-                        <div className="demo-offer-title">{o.headline}</div>
-                        <div className="demo-muted">
-                          {o.priceText} , {o.deliveryText}
-                          {arrived ? <span> , received {arrived}</span> : null}
-                        </div>
+        {/* RIGHT COLUMN */}
+        <div className="card">
+          {/* Main right content */}
+          {rightTab === "offers" && (
+            <>
+              <div className="demo-section-title">
+                <h2>Offers</h2>
+                <span className="demo-smalllink">Select one to negotiate</span>
+              </div>
 
-                        <div className="demo-badges">
-                          <span className={"demo-badge " + (o.reliabilityLabel === "Verified" ? "good" : "")}>
-                            {o.reliabilityLabel}
-                          </span>
-                          <span className="demo-badge">{o.fastReplyLabel}</span>
-                          <span className="demo-badge">{o.sellerName}</span>
-                          <span className="demo-badge">{o.sourceLabel}</span>
-                        </div>
+              {!thread && (
+                <div className="content-section">
+                  <h3>No offers yet</h3>
+                  <p>Send a request to broadcast to merchants and see responses arrive.</p>
+                </div>
+              )}
 
-                        <div style={{ marginTop: 10 }}>
-                          <a href={o.productUrl} target="_blank" rel="noreferrer">
-                            View product
-                          </a>
-                        </div>
+              {thread && thread.offers.map((o) => (
+                <div className="demo-offer" key={o.id}>
+                  <div className="demo-offer-top">
+                    <img className="demo-offer-img" src={o.imageUrl} alt={o.headline} />
+                    <div style={{ flex: 1 }}>
+                      <div className="demo-offer-title">{o.headline}</div>
+                      <div className="demo-muted">{o.priceText} , {o.deliveryText}</div>
+
+                      <div className="demo-badges">
+                        <span className={"demo-badge " + (o.reliabilityLabel === "Verified" ? "good" : "")}>
+                          {o.reliabilityLabel}
+                        </span>
+                        <span className="demo-badge">{o.fastReplyLabel}</span>
+                        <span className="demo-badge">{o.sellerName}</span>
+                        <span className="demo-badge">{o.sourceLabel}</span>
+                      </div>
+
+                      <div style={{ marginTop: 10 }}>
+                        <a href={o.productUrl} target="_blank" rel="noreferrer">View product</a>
                       </div>
                     </div>
-
-                    <button className="cta-button" onClick={() => selectOffer(o.id)} disabled={loading || thread.kpis.confirmed}>
-                      {selected ? "Selected" : "Negotiate with seller agent"}
-                    </button>
                   </div>
-                );
-              })
-            )}
 
-            {transparencyOn ? (
-              <div className="content-section">
-                <h3>Agent transparency</h3>
-
-                {!thread ? (
-                  <p>When active, this shows intent routing, merchant broadcast, and tool usage.</p>
-                ) : (
-                  <>
-                    <p>
-                      <b>Intent category:</b> {debugCategory || "Unknown"}
-                    </p>
-                    {debugQuery ? <p><b>Clean query:</b> {debugQuery}</p> : null}
-                    {debugStores.length ? <p><b>Broadcast to:</b> {debugStores.join(" , ")}</p> : <p><b>Broadcast to:</b> Not shown (debug payload missing).</p>}
-                    {debugTool ? <p><b>MCP tool:</b> {debugTool}</p> : null}
-                    <p><b>Offers received:</b> {thread.kpis.offersCount} / 3</p>
-                    <p style={{ opacity: 0.8 }}>
-                      Confirm is always gated by buyer approval. This is a demonstration of agent coordination, not a checkout funnel.
-                    </p>
-                  </>
-                )}
-              </div>
-            ) : null}
-          </div>
-
-          {/* Conversation spanning BOTH columns */}
-          <div className="card" style={{ gridColumn: "1 / -1" }}>
-            <div className="demo-section-title">
-              <h2>Conversation</h2>
-              <span className="demo-smalllink">{thread ? `Status: ${thread.status}` : "Not started"}</span>
-            </div>
-
-            {!thread ? (
-              <div className="demo-item">
-                <div className="demo-meta"><span>Waiting</span><span>Not started</span></div>
-                <div className="demo-text">Send a request to see the agent coordination thread.</div>
-              </div>
-            ) : (
-              <>
-                {thread.events.map((e) => (
-                  <div className="demo-item" key={e.id}>
-                    <div className="demo-meta"><span>{e.who}</span><span>{safeTime(e.ts)}</span></div>
-                    <div className="demo-text">{e.text}</div>
-                  </div>
-                ))}
-
-                <div className="demo-actions">
-                  <button
-                    className="cta-button"
-                    onClick={() => {
-                      const text = window.prompt("Ask for an adjustment or clarification:");
-                      if (text) sendMessage(text);
-                    }}
-                    disabled={loading || !thread.selectedOfferId || thread.kpis.confirmed}
-                  >
-                    Ask a follow-up
-                  </button>
-
-                  <button
-                    className="cta-button"
-                    onClick={confirm}
-                    disabled={loading || thread.status !== "AGREED" || thread.kpis.confirmed}
-                  >
-                    Confirm
+                  <button className="cta-button" onClick={() => selectOffer(o.id)} disabled={loading || thread.kpis.confirmed}>
+                    {thread.selectedOfferId === o.id ? "Selected" : "Select and negotiate"}
                   </button>
                 </div>
-              </>
-            )}
+              ))}
+            </>
+          )}
+
+          {rightTab === "transparency" && (
+            <>
+              <div className="demo-section-title">
+                <h2>Transparency</h2>
+                <span className="demo-smalllink">What the agent is doing</span>
+              </div>
+
+              {!thread && (
+                <div className="demo-item">
+                  <div className="demo-meta"><span>Not started</span><span>Waiting</span></div>
+                  <div className="demo-text">Send a request first.</div>
+                </div>
+              )}
+
+              {thread && (
+                <>
+                  <div className="demo-item">
+                    <div className="demo-meta"><span>Intent</span><span>{thread.kpis.category ?? "pending"}</span></div>
+                    <div className="demo-text">Request is classified, then broadcast to multiple merchants in the matched category.</div>
+                  </div>
+
+                  <div className="demo-item">
+                    <div className="demo-meta"><span>Responses</span><span>{thread.kpis.offersCount}/3</span></div>
+                    <div className="demo-text">Merchant responses are normalised into comparable offer objects.</div>
+                  </div>
+
+                  <div className="demo-item">
+                    <div className="demo-meta"><span>Negotiation</span><span>{thread.selectedOfferId ? "Open" : "Not started"}</span></div>
+                    <div className="demo-text">
+                      {thread.selectedOfferId
+                        ? "One offer is selected. Messages now target that merchant thread until you confirm."
+                        : "Select an offer to begin negotiation."}
+                    </div>
+                  </div>
+
+                  <div className="demo-item">
+                    <div className="demo-meta"><span>Confirmation</span><span>{thread.kpis.confirmed ? "Confirmed" : "Pending"}</span></div>
+                    <div className="demo-text">Final step always requires explicit buyer approval.</div>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {rightTab === "debug" && (
+            <>
+              <div className="demo-section-title">
+                <h2>Debug</h2>
+                <span className="demo-smalllink">Raw diagnostics</span>
+              </div>
+
+              {!thread && (
+                <div className="demo-item">
+                  <div className="demo-meta"><span>No data</span><span>Waiting</span></div>
+                  <div className="demo-text">Start a request to see diagnostics.</div>
+                </div>
+              )}
+
+              {thread && (
+                <div className="demo-item">
+                  <div className="demo-meta"><span>Thread</span><span>{thread.threadId}</span></div>
+                  <div className="demo-text" style={{ whiteSpace: "pre-wrap" }}>
+                    {JSON.stringify(
+                      {
+                        status: thread.status,
+                        kpis: thread.kpis,
+                        selectedOfferId: thread.selectedOfferId ?? null,
+                        debug: thread.debug ?? null
+                      },
+                      null,
+                      2
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Buttons moved to bottom of right column */}
+          <div style={{ marginTop: 16 }}>
+            <div className="demo-controls" style={{ justifyContent: "center" }}>
+              <button
+                className={"demo-pill " + (rightTab === "transparency" ? "active" : "")}
+                onClick={() => setRightTab("transparency")}
+              >
+                Transparency
+              </button>
+              <button
+                className={"demo-pill " + (rightTab === "debug" ? "active" : "")}
+                onClick={() => setRightTab("debug")}
+              >
+                Debug
+              </button>
+              <button
+                className={"demo-pill " + (rightTab === "offers" ? "active" : "")}
+                onClick={() => setRightTab("offers")}
+              >
+                Offers
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Conversation full width */}
+        <div className="card" style={{ gridColumn: "1 / -1" }}>
+          <div className="demo-section-title">
+            <h2>Conversation</h2>
+            <span className="demo-smalllink">{thread ? `Status: ${thread.status}` : "Not started"}</span>
           </div>
 
-          {/* Notes spanning BOTH columns */}
-          <div className="content-section" style={{ gridColumn: "1 / -1" }}>
-            <h3>Notes</h3>
-            <p style={{ opacity: 0.85 }}>
-              Placeholder. We will decide the content later.
-            </p>
+          {!thread && (
+            <div className="demo-item">
+              <div className="demo-meta"><span>Waiting</span><span>Send a request</span></div>
+              <div className="demo-text">Send a request to see the agent coordination thread.</div>
+            </div>
+          )}
+
+          {thread && thread.events.map((e) => (
+            <div className="demo-item" key={e.id}>
+              <div className="demo-meta">
+                <span>{e.who}</span>
+                <span>{new Date(e.ts).toLocaleTimeString()}</span>
+              </div>
+              <div className="demo-text">{e.text}</div>
+            </div>
+          ))}
+
+          {thread && (
+            <div className="demo-actions">
+              <button
+                className="cta-button"
+                onClick={() => {
+                  const text = window.prompt("Ask for an adjustment or clarification:");
+                  if (text) sendMessage(text);
+                }}
+                disabled={loading || !thread.selectedOfferId || thread.kpis.confirmed}
+              >
+                Ask a follow-up
+              </button>
+
+              <button
+                className="cta-button"
+                onClick={confirm}
+                disabled={loading || thread.status !== "AGREED" || thread.kpis.confirmed}
+              >
+                Confirm
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* NOTES full width */}
+        <div className="content-section" style={{ gridColumn: "1 / -1" }}>
+          <h3>NOTES</h3>
+          <div style={{ whiteSpace: "pre-wrap", opacity: 0.9 }}>
+            {notesText}
           </div>
         </div>
       </div>
-    </main>
+
+      {/* Footer row: copyright left, X right */}
+      <footer
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "1.25rem 0",
+          opacity: 0.85
+        }}
+      >
+        <div>(C) Via Labs Pte Ltd</div>
+
+        <a
+          href={xUrl}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="VIA on X"
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, textDecoration: "none" }}
+        >
+          {/* Simple X icon as SVG */}
+          <svg width="18" height="18" viewBox="0 0 1200 1227" fill="currentColor" aria-hidden="true">
+            <path d="M714 519L1160 0H1050L667 450L361 0H0L468 681L0 1227H110L515 750L839 1227H1200L714 519ZM564 694L517 627L150 79H320L616 556L663 623L1050 1148H880L564 694Z" />
+          </svg>
+          <span style={{ fontSize: 14 }}>X</span>
+        </a>
+      </footer>
+    </div>
   );
 }
+
