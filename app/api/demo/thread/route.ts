@@ -49,24 +49,114 @@ function matchesKeyWord(title: string, key: string | null): boolean {
 }
 
 // Prefer offers that look "real" to humans.
-// Price can be blank for some stores, but image + productUrl are essential for credibility.
-function isUsableLiveProduct(p: { title: string; imageUrl: string; productUrl: string; priceText: string }) {
+function isUsableLiveProduct(p: { title: string; imageUrl: string; productUrl: string }) {
   if (!p?.title) return false;
   if (!p?.imageUrl || p.imageUrl.includes("placehold.co")) return false;
   if (!p?.productUrl || p.productUrl === "#") return false;
   return true;
 }
 
-// Pick more stores than we need, then take the first 3 that actually return usable products.
-// This is how you avoid being dependent on specific merchants.
+type Currency = "USD" | "GBP" | "EUR" | "AUD" | "CAD" | "UNKNOWN";
+
+function currencyFromText(t: string): Currency {
+  const s = (t || "").toUpperCase();
+  if (s.includes("USD")) return "USD";
+  if (s.includes("GBP")) return "GBP";
+  if (s.includes("EUR")) return "EUR";
+  if (s.includes("AUD")) return "AUD";
+  if (s.includes("CAD")) return "CAD";
+  if (t.includes("$")) return "USD";
+  if (t.includes("£")) return "GBP";
+  if (t.includes("€")) return "EUR";
+  return "UNKNOWN";
+}
+
+// Returns price in "minor units" (cents/pence), plus detected currency.
+// If we cannot parse, returns null.
+function parsePriceMinor(priceText: string): { minor: number; currency: Currency } | null {
+  const raw = (priceText ?? "").toString().trim();
+  if (!raw) return null;
+
+  const currency = currencyFromText(raw);
+
+  // Strip everything except digits, dots, commas
+  const cleaned = raw.replace(/[^\d.,]/g, "");
+  if (!cleaned) return null;
+
+  // Handle "1,299.99" vs "1.299,99" very roughly:
+  // If both comma and dot exist, assume comma is thousands separator.
+  let normalised = cleaned;
+  const hasComma = cleaned.includes(",");
+  const hasDot = cleaned.includes(".");
+  if (hasComma && hasDot) {
+    normalised = cleaned.replace(/,/g, "");
+  } else if (hasComma && !hasDot) {
+    // likely "199,99" format
+    normalised = cleaned.replace(/,/g, ".");
+  }
+
+  const val = Number(normalised);
+  if (!Number.isFinite(val)) return null;
+
+  return { minor: Math.round(val * 100), currency };
+}
+
+type PriceConstraint = {
+  minMinor?: number;
+  maxMinor?: number;
+  currency?: Currency;
+};
+
+// Very simple intent parsing: handles "over 200", "under 200", "over USD 200", "$200", "£200", "200+"
+function extractPriceConstraint(requestText: string): PriceConstraint {
+  const t = (requestText || "").toLowerCase();
+
+  let currency: Currency | undefined;
+  if (t.includes("usd")) currency = "USD";
+  else if (t.includes("gbp")) currency = "GBP";
+  else if (t.includes("eur")) currency = "EUR";
+  else if (t.includes("aud")) currency = "AUD";
+  else if (t.includes("cad")) currency = "CAD";
+  else if (t.includes("$")) currency = "USD";
+  else if (t.includes("£")) currency = "GBP";
+  else if (t.includes("€")) currency = "EUR";
+
+  // Find a number that looks like a price
+  const m = t.match(/(?:usd|gbp|eur|aud|cad)?\s*[$£€]?\s*(\d{2,5})(?:\.(\d{1,2}))?/i);
+  const num = m ? Number(m[1] + (m[2] ? "." + m[2] : "")) : null;
+
+  const constraint: PriceConstraint = {};
+  if (currency) constraint.currency = currency;
+
+  if (num && Number.isFinite(num)) {
+    const minor = Math.round(num * 100);
+
+    // Over / under / below / above heuristics
+    if (t.includes("over") || t.includes("above") || t.includes("more than") || t.includes("+")) {
+      constraint.minMinor = minor; // treat as >=
+    } else if (t.includes("under") || t.includes("below") || t.includes("less than") || t.includes("max")) {
+      constraint.maxMinor = minor; // treat as <=
+    }
+    // If neither over/under, we do not enforce, because user may just be stating a reference.
+  }
+
+  return constraint;
+}
+
+function withinConstraint(priceMinor: number, c: PriceConstraint): boolean {
+  if (typeof c.minMinor === "number" && priceMinor < c.minMinor) return false;
+  if (typeof c.maxMinor === "number" && priceMinor > c.maxMinor) return false;
+  return true;
+}
+
+// Pick a wider pool, then take the first 3 that actually return usable products that satisfy constraints.
 function pickCandidateStores(stores: StoreEntry[], category: StoreCategory, max = 9): StoreEntry[] {
   const filtered = stores.filter(s => s.enabled && s.category === category);
 
-  // Shuffle to avoid the same 3 every time.
-  // Not cryptographically secure, just enough for variety.
+  // Shuffle for variety
   const shuffled = [...filtered].sort(() => Math.random() - 0.5);
 
-  // Weight can still bias selection: push higher weight earlier.
+  // Bias by weight
   shuffled.sort((a, b) => (b.weight ?? 100) - (a.weight ?? 100));
 
   return shuffled.slice(0, max);
@@ -77,6 +167,8 @@ function offerFromMcpProduct(args: {
   storeName: string;
   title: string;
   priceText: string;
+  priceMinor: number;
+  currency: Currency;
   imageUrl: string;
   productUrl: string;
   arrivalDelayMs: number;
@@ -89,9 +181,10 @@ function offerFromMcpProduct(args: {
     headline: args.title,
     imageUrl: args.imageUrl || "https://placehold.co/600x400/png?text=Product",
     productUrl: args.productUrl || "#",
-    pricePence: 0,
+    // NOTE: field name is legacy; we store minor units (cents/pence) regardless of currency
+    pricePence: args.priceMinor,
     priceTextOverride: args.priceText || "",
-    currency: "GBP",
+    currency: (args.currency === "UNKNOWN" ? "USD" : args.currency) as any,
     deliveryDays: 3,
     reliabilityLabel: args.reliabilityLabel,
     replyClass: "normal",
@@ -118,13 +211,13 @@ export async function POST(req: Request) {
 
   const thread = makeInitialThread(requestText, mode);
 
-  // Optional debug: send { debug:true } in the POST body if you ever wire it in the UI.
   const debugOn = body?.debug === true;
   const debug: any = debugOn
     ? {
         category: null as any,
         cleanedQuery: null as any,
         keyWord: null as any,
+        priceConstraint: null as any,
         candidateStores: [] as any[],
         contacted: 0,
         collectedOffers: 0,
@@ -136,17 +229,16 @@ export async function POST(req: Request) {
     const category = classifyIntent(requestText) as StoreCategory;
     const keyWord = extractKeyItemWord(requestText);
     const q = cleanQuery(requestText);
+    const priceConstraint = extractPriceConstraint(requestText);
 
     if (debug) {
       debug.category = category;
       debug.cleanedQuery = q;
       debug.keyWord = keyWord;
+      debug.priceConstraint = priceConstraint;
     }
 
     const stores = await loadStoreRegistry();
-
-    // IMPORTANT CHANGE:
-    // We do NOT pick only 3. We pick a wider pool, then we take the first 3 that actually respond with usable products.
     const candidates = pickCandidateStores(stores, category, 9);
 
     if (debug) {
@@ -163,13 +255,10 @@ export async function POST(req: Request) {
     if (candidates.length) {
       const liveOffers: Offer[] = [];
 
-      // Slower pacing looks more “considered”.
-      // This is intentionally not “fastest possible”.
-      const baseDelay = 1400;
-      const stepDelay = 1700;
+      // Intentionally slower pacing
+      const baseDelay = 1600;
+      const stepDelay = 1900;
 
-      // Contact stores sequentially until we have 3 usable offers or we run out.
-      // Sequential also makes the demo more reliable under rate limits and intermittent failures.
       for (const store of candidates) {
         if (liveOffers.length >= 3) break;
 
@@ -186,6 +275,82 @@ export async function POST(req: Request) {
 
         if (debug) debug.contacted += 1;
 
+        if (!r.ok || !r.products.length) {
+          if (debug) {
+            debug.storeResults.push({
+              storeId: store.id,
+              storeName: store.name,
+              ok: r.ok,
+              toolUsed: r.toolUsed,
+              error: r.error,
+              productCount: r.products?.length ?? 0,
+              accepted: false,
+              reason: "No products"
+            });
+          }
+          continue;
+        }
+
+        // Filter to usable live products with parsable price that meets constraint (if any)
+        const candidatesProducts = r.products
+          .filter(p => isUsableLiveProduct(p))
+          .map(p => {
+            const parsed = parsePriceMinor(p.priceText || "");
+            return { p, parsed };
+          })
+          .filter(x => x.parsed !== null)
+          .filter(x => withinConstraint((x.parsed as any).minor, priceConstraint));
+
+        // Prefer keyword match within the filtered set
+        let chosen: any = null;
+        if (candidatesProducts.length) {
+          chosen =
+            candidatesProducts.find(x => matchesKeyWord(x.p.title, keyWord)) ||
+            candidatesProducts[0];
+        }
+
+        if (!chosen) {
+          if (debug) {
+            debug.storeResults.push({
+              storeId: store.id,
+              storeName: store.name,
+              ok: r.ok,
+              toolUsed: r.toolUsed,
+              error: r.error,
+              productCount: r.products?.length ?? 0,
+              accepted: false,
+              reason: "No usable products meeting price constraint"
+            });
+          }
+          continue;
+        }
+
+        const parsed = chosen.parsed as { minor: number; currency: Currency };
+        const delay = baseDelay + liveOffers.length * stepDelay;
+
+        // Decide currency: prefer constraint currency if present, else parsed currency
+        const cur: Currency = priceConstraint.currency && priceConstraint.currency !== "UNKNOWN"
+          ? priceConstraint.currency
+          : parsed.currency;
+
+        const trust: "Verified" | "Reliable" | "New" =
+          (store.weight ?? 100) >= 120 ? "Verified" : "Reliable";
+
+        liveOffers.push(
+          offerFromMcpProduct({
+            storeId: store.id,
+            storeName: store.name,
+            title: chosen.p.title,
+            priceText: chosen.p.priceText,
+            priceMinor: parsed.minor,
+            currency: cur,
+            imageUrl: chosen.p.imageUrl,
+            productUrl: chosen.p.productUrl,
+            arrivalDelayMs: delay,
+            reliabilityLabel: trust
+          })
+        );
+
         if (debug) {
           debug.storeResults.push({
             storeId: store.id,
@@ -194,61 +359,4 @@ export async function POST(req: Request) {
             toolUsed: r.toolUsed,
             error: r.error,
             productCount: r.products?.length ?? 0,
-            firstProduct: r.products?.[0] ?? null
-          });
-        }
-
-        if (!r.ok || !r.products.length) continue;
-
-        const matched =
-          r.products.find((p) => matchesKeyWord(p.title, keyWord)) || r.products[0];
-
-        // Skip products that do not look live/credible (missing image/url).
-        if (!isUsableLiveProduct(matched)) continue;
-
-        // Reliability: keep simple and not merchant-specific.
-        // If a store is higher weight, label Verified. Otherwise Reliable.
-        const trust: "Verified" | "Reliable" | "New" =
-          (store.weight ?? 100) >= 120 ? "Verified" : "Reliable";
-
-        const delay = baseDelay + liveOffers.length * stepDelay;
-
-        liveOffers.push(
-          offerFromMcpProduct({
-            storeId: store.id,
-            storeName: store.name,
-            title: matched.title,
-            priceText: matched.priceText,
-            imageUrl: matched.imageUrl,
-            productUrl: matched.productUrl,
-            arrivalDelayMs: delay,
-            reliabilityLabel: trust
-          })
-        );
-
-        if (debug) debug.collectedOffers = liveOffers.length;
-      }
-
-      // Replace mocks only if we have at least 1 live offer.
-      if (liveOffers.length >= 1) {
-        thread.offers = liveOffers;
-
-        const nowIso = new Date().toISOString();
-        thread.events.push({
-          id: `e_${Math.random().toString(16).slice(2)}`,
-          ts: nowIso,
-          who: "Your assistant",
-          text: `I contacted ${Math.min(candidates.length, 9)} participating sellers. Live responses are coming in now.`
-        });
-      }
-    }
-  } catch (e: any) {
-    if (debug) debug.fatal = String(e?.message ?? e);
-    // keep mock offers if anything fails
-  }
-
-  const token = encodeToken(thread);
-  const ui = toUI(thread, new Date());
-
-  return NextResponse.json({ ...ui, token, debug }, { status: 200 });
-}
+            accepted:
