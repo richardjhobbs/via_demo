@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -317,8 +316,9 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* Top 2-column layout */}
         <div className="demo-split">
-          {/* LEFT */}
+          {/* LEFT COLUMN: Intent, Orchestration, Timeline (plus request input at the top) */}
           <div className="card">
             <div className="demo-section-title">
               <h2>Request</h2>
@@ -332,25 +332,49 @@ export default function HomePage() {
 
             <div style={{ height: 12 }} />
 
-            <div className="demo-row">
-              <input
-                type="text"
-                value={requestText}
-                onChange={(e) => setRequestText(e.target.value)}
-                placeholder='Try: "Cycling helmet under 80" or "Dog treats delivered this week"'
-              />
-              <button className="cta-button" disabled={loading || requestText.trim().length === 0} onClick={createThread}>
-                {loading ? "Working..." : "Send"}
-              </button>
-            </div>
+            {/* Prominent full-width input */}
+            <input
+              type="text"
+              value={requestText}
+              onChange={(e) => setRequestText(e.target.value)}
+              placeholder='Try: "Cycling helmet under 80" or "Dog treats delivered this week"'
+              style={{ fontSize: 18, padding: "1rem" }}
+            />
+
+            <div style={{ height: 10 }} />
+
+            <button
+              className="cta-button"
+              disabled={loading || requestText.trim().length === 0}
+              onClick={createThread}
+              style={{ fontSize: "1.05rem" }}
+            >
+              {loading ? "Working..." : "Send"}
+            </button>
 
             <div style={{ height: 16 }} />
 
             <div className="content-section">
-              <h3>Agent orchestration</h3>
+              <h3>Intent</h3>
+              <p>
+                <b>Detected category:</b> {thread ? (thread.kpis.category ?? "Unknown") : "Waiting"}
+              </p>
+              {thread ? (
+                <p style={{ opacity: 0.8 }}>
+                  <b>Current phase:</b> {phaseLabel}
+                </p>
+              ) : (
+                <p style={{ opacity: 0.8 }}>
+                  Send a request to begin routing and orchestration.
+                </p>
+              )}
+            </div>
+
+            <div className="content-section">
+              <h3>Orchestration</h3>
               <p><b>Current phase:</b> {phaseLabel}</p>
               <p style={{ opacity: 0.8 }}>
-                This is a live demo. Speed is not the point. Clarity of agent coordination is.
+                This is a live demo pulling real data from real stores to show agent coordination.
               </p>
             </div>
 
@@ -410,50 +434,9 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-
-            <div className="content-section">
-              <h3>Conversation</h3>
-
-              {!thread ? (
-                <div className="demo-item">
-                  <div className="demo-meta"><span>Waiting</span><span>Not started</span></div>
-                  <div className="demo-text">Send a request to see the agent coordination thread.</div>
-                </div>
-              ) : (
-                thread.events.map((e) => (
-                  <div className="demo-item" key={e.id}>
-                    <div className="demo-meta"><span>{e.who}</span><span>{safeTime(e.ts)}</span></div>
-                    <div className="demo-text">{e.text}</div>
-                  </div>
-                ))
-              )}
-
-              {thread ? (
-                <div className="demo-actions">
-                  <button
-                    className="cta-button"
-                    onClick={() => {
-                      const text = window.prompt("Ask for an adjustment or clarification:");
-                      if (text) sendMessage(text);
-                    }}
-                    disabled={loading || !thread.selectedOfferId || thread.kpis.confirmed}
-                  >
-                    Ask a follow-up
-                  </button>
-
-                  <button
-                    className="cta-button"
-                    onClick={confirm}
-                    disabled={loading || thread.status !== "AGREED" || thread.kpis.confirmed}
-                  >
-                    Confirm
-                  </button>
-                </div>
-              ) : null}
-            </div>
           </div>
 
-          {/* RIGHT */}
+          {/* RIGHT COLUMN: Offers + Transparency only */}
           <div className="card">
             <div className="demo-section-title">
               <h2>Offers</h2>
@@ -528,13 +511,59 @@ export default function HomePage() {
                 )}
               </div>
             ) : null}
+          </div>
 
-            <div className="content-section">
-              <h3>Roadmap</h3>
-              <p>Assisted today, you confirm the final step.</p>
-              <p>Guided next, assistants negotiate within clearer rules.</p>
-              <p>Autonomous later, assistants complete purchases when conditions match.</p>
+          {/* Conversation spanning BOTH columns */}
+          <div className="card" style={{ gridColumn: "1 / -1" }}>
+            <div className="demo-section-title">
+              <h2>Conversation</h2>
+              <span className="demo-smalllink">{thread ? `Status: ${thread.status}` : "Not started"}</span>
             </div>
+
+            {!thread ? (
+              <div className="demo-item">
+                <div className="demo-meta"><span>Waiting</span><span>Not started</span></div>
+                <div className="demo-text">Send a request to see the agent coordination thread.</div>
+              </div>
+            ) : (
+              <>
+                {thread.events.map((e) => (
+                  <div className="demo-item" key={e.id}>
+                    <div className="demo-meta"><span>{e.who}</span><span>{safeTime(e.ts)}</span></div>
+                    <div className="demo-text">{e.text}</div>
+                  </div>
+                ))}
+
+                <div className="demo-actions">
+                  <button
+                    className="cta-button"
+                    onClick={() => {
+                      const text = window.prompt("Ask for an adjustment or clarification:");
+                      if (text) sendMessage(text);
+                    }}
+                    disabled={loading || !thread.selectedOfferId || thread.kpis.confirmed}
+                  >
+                    Ask a follow-up
+                  </button>
+
+                  <button
+                    className="cta-button"
+                    onClick={confirm}
+                    disabled={loading || thread.status !== "AGREED" || thread.kpis.confirmed}
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Notes spanning BOTH columns */}
+          <div className="content-section" style={{ gridColumn: "1 / -1" }}>
+            <h3>Notes</h3>
+            <p style={{ opacity: 0.85 }}>
+              Placeholder. We will decide the content later.
+            </p>
           </div>
         </div>
       </div>
