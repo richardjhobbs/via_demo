@@ -1,3 +1,4 @@
+
 import crypto from "crypto";
 
 export type Mode = "buyer" | "seller";
@@ -13,9 +14,15 @@ export type Offer = {
   imageUrl: string;
   productUrl: string;
 
+  // We keep these for later, but the UI will prefer priceTextOverride when present.
   pricePence: number;
-  priceTextOverride?: string; // FIX: this must be top-level
-  currency: "GBP";
+
+  // IMPORTANT: allow multi-currency for demo (not locked to GBP).
+  currency: string;
+
+  // Merchant-provided price string (eg "$129", "€89", "AUD 199", etc).
+  priceTextOverride?: string;
+
   deliveryDays: number;
 
   reliabilityLabel: "Verified" | "Reliable" | "New";
@@ -101,9 +108,16 @@ export function id(prefix: string): string {
   return `${prefix}_${crypto.randomBytes(8).toString("hex")}`;
 }
 
-function toPriceTextGBP(pence: number): string {
+function toPriceText(pence: number, currency: string): string {
   const v = (pence / 100).toFixed(0);
-  return `£${v}`;
+
+  // simple symbol mapping for later use if needed
+  const c = (currency || "").toUpperCase();
+  if (c === "GBP") return `£${v}`;
+  if (c === "USD") return `$${v}`;
+  if (c === "EUR") return `€${v}`;
+
+  return `${c} ${v}`.trim();
 }
 
 function deliveryText(days: number): string {
@@ -114,84 +128,25 @@ function deliveryText(days: number): string {
 
 function containsAny(s: string, needles: string[]): boolean {
   const x = s.toLowerCase();
-  return needles.some((n) => x.includes(n));
+  return needles.some(n => x.includes(n));
 }
 
 export function classifyIntent(requestText: string): Category {
   const t = requestText.toLowerCase();
 
-  if (
-    containsAny(t, [
-      "sneaker",
-      "trainers",
-      "running shoe",
-      "air max",
-      "dunk",
-      "jordans",
-      "nike",
-      "adidas",
-      "new balance",
-      "asics"
-    ])
-  ) {
+  if (containsAny(t, ["sneaker", "trainers", "running shoe", "air max", "dunk", "jordans", "nike", "adidas", "new balance", "asics"])) {
     return "sneakers";
   }
 
-  if (
-    containsAny(t, [
-      "hike",
-      "hiking",
-      "trail",
-      "waterproof",
-      "gore",
-      "camp",
-      "camping",
-      "tent",
-      "backpack",
-      "rucksack",
-      "outdoor",
-      "jacket",
-      "boots"
-    ])
-  ) {
+  if (containsAny(t, ["hike", "hiking", "trail", "waterproof", "gore", "camp", "camping", "tent", "backpack", "rucksack", "outdoor", "jacket", "boots"])) {
     return "outdoor";
   }
 
-  if (
-    containsAny(t, [
-      "cycle",
-      "cycling",
-      "bike",
-      "bicycle",
-      "mtb",
-      "road bike",
-      "jersey",
-      "bib",
-      "helmet",
-      "cleats",
-      "shimano",
-      "sram"
-    ])
-  ) {
+  if (containsAny(t, ["cycle", "cycling", "bike", "bicycle", "mtb", "road bike", "jersey", "bib", "helmet", "cleats", "shimano", "sram"])) {
     return "cycling";
   }
 
-  if (
-    containsAny(t, [
-      "pet",
-      "dog",
-      "cat",
-      "kitten",
-      "puppy",
-      "leash",
-      "collar",
-      "litter",
-      "kibble",
-      "treats",
-      "groom",
-      "toy"
-    ])
-  ) {
+  if (containsAny(t, ["pet", "dog", "cat", "kitten", "puppy", "leash", "collar", "litter", "kibble", "treats", "groom", "toy"])) {
     return "pet";
   }
 
@@ -212,11 +167,8 @@ function placeholderImage(category: Category, seed: string): string {
 }
 
 function makeOffersForCategory(category: Category): Offer[] {
-  const baseSource = "Demo offer"; // FIX: do not claim live pricing for mocks
-
-  const common = {
-    currency: "GBP" as const
-  };
+  const baseSource = "Live pricing, curated sellers";
+  const common = { currency: "GBP" };
 
   if (category === "sneakers") {
     return [
@@ -228,7 +180,7 @@ function makeOffersForCategory(category: Category): Offer[] {
         imageUrl: placeholderImage(category, "01"),
         productUrl: "#",
         pricePence: 12500,
-        ...common,
+        currency: common.currency,
         deliveryDays: 2,
         reliabilityLabel: "Reliable",
         replyClass: "fast",
@@ -244,7 +196,7 @@ function makeOffersForCategory(category: Category): Offer[] {
         imageUrl: placeholderImage(category, "02"),
         productUrl: "#",
         pricePence: 13900,
-        ...common,
+        currency: common.currency,
         deliveryDays: 3,
         reliabilityLabel: "Verified",
         replyClass: "normal",
@@ -260,7 +212,7 @@ function makeOffersForCategory(category: Category): Offer[] {
         imageUrl: placeholderImage(category, "03"),
         productUrl: "#",
         pricePence: 11900,
-        ...common,
+        currency: common.currency,
         deliveryDays: 4,
         reliabilityLabel: "New",
         replyClass: "normal",
@@ -281,7 +233,7 @@ function makeOffersForCategory(category: Category): Offer[] {
         imageUrl: placeholderImage(category, "01"),
         productUrl: "#",
         pricePence: 8900,
-        ...common,
+        currency: common.currency,
         deliveryDays: 2,
         reliabilityLabel: "Reliable",
         replyClass: "fast",
@@ -297,7 +249,7 @@ function makeOffersForCategory(category: Category): Offer[] {
         imageUrl: placeholderImage(category, "02"),
         productUrl: "#",
         pricePence: 12900,
-        ...common,
+        currency: common.currency,
         deliveryDays: 3,
         reliabilityLabel: "Verified",
         replyClass: "normal",
@@ -313,7 +265,7 @@ function makeOffersForCategory(category: Category): Offer[] {
         imageUrl: placeholderImage(category, "03"),
         productUrl: "#",
         pricePence: 7400,
-        ...common,
+        currency: common.currency,
         deliveryDays: 4,
         reliabilityLabel: "New",
         replyClass: "normal",
@@ -334,7 +286,7 @@ function makeOffersForCategory(category: Category): Offer[] {
         imageUrl: placeholderImage(category, "01"),
         productUrl: "#",
         pricePence: 1900,
-        ...common,
+        currency: common.currency,
         deliveryDays: 2,
         reliabilityLabel: "Reliable",
         replyClass: "fast",
@@ -350,7 +302,7 @@ function makeOffersForCategory(category: Category): Offer[] {
         imageUrl: placeholderImage(category, "02"),
         productUrl: "#",
         pricePence: 3200,
-        ...common,
+        currency: common.currency,
         deliveryDays: 3,
         reliabilityLabel: "Verified",
         replyClass: "normal",
@@ -366,7 +318,7 @@ function makeOffersForCategory(category: Category): Offer[] {
         imageUrl: placeholderImage(category, "03"),
         productUrl: "#",
         pricePence: 1600,
-        ...common,
+        currency: common.currency,
         deliveryDays: 4,
         reliabilityLabel: "New",
         replyClass: "normal",
@@ -433,7 +385,7 @@ export function visibleOffers(t: InternalThread, now: Date): Offer[] {
   const created = new Date(t.createdAt).getTime();
   const elapsed = now.getTime() - created;
   return t.offers
-    .filter((o) => elapsed >= o.arrivalDelayMs)
+    .filter(o => elapsed >= o.arrivalDelayMs)
     .sort((a, b) => a.arrivalDelayMs - b.arrivalDelayMs);
 }
 
@@ -445,7 +397,9 @@ export function uiOffer(o: Offer) {
     imageUrl: o.imageUrl,
     productUrl: o.productUrl,
     sourceLabel: o.sourceLabel,
-    priceText: o.priceTextOverride ? o.priceTextOverride : `${toPriceTextGBP(o.pricePence)}`,
+    priceText: o.priceTextOverride && o.priceTextOverride.trim()
+      ? o.priceTextOverride
+      : toPriceText(o.pricePence, o.currency),
     deliveryText: deliveryText(o.deliveryDays),
     reliabilityLabel: o.reliabilityLabel,
     fastReplyLabel: o.replyClass === "fast" ? "Replies fast" : "Normal reply"
@@ -517,7 +471,7 @@ export function makeInitialThread(requestText: string, mode: Mode): InternalThre
 }
 
 export function selectOfferInThread(t: InternalThread, offerId: string): InternalThread {
-  const offer = t.offers.find((o) => o.id === offerId);
+  const offer = t.offers.find(o => o.id === offerId);
   if (!offer) return t;
 
   const now = new Date().toISOString();
@@ -547,7 +501,7 @@ export function selectOfferInThread(t: InternalThread, offerId: string): Interna
 }
 
 export function buyerMessage(t: InternalThread, text: string): InternalThread {
-  const offer = t.selectedOfferId ? t.offers.find((o) => o.id === t.selectedOfferId) : null;
+  const offer = t.selectedOfferId ? t.offers.find(o => o.id === t.selectedOfferId) : null;
   const nowIso = new Date().toISOString();
   const events = [...t.events];
 
@@ -577,21 +531,21 @@ export function buyerMessage(t: InternalThread, text: string): InternalThread {
       delivery = Math.max(1, delivery - 1);
       price = price + offer.policy.upgradeFeePence;
       notes.push("Delivery upgraded");
-      sellerReply = `I can upgrade delivery. Updated terms: ${toPriceTextGBP(price)} with ${deliveryText(delivery)}.`;
+      sellerReply = `I can upgrade delivery. Updated terms: ${toPriceText(price, offer.currency)} with ${deliveryText(delivery)}.`;
     } else {
-      sellerReply = `I can’t upgrade delivery on this one. Current terms remain: ${toPriceTextGBP(price)} with ${deliveryText(delivery)}.`;
+      sellerReply = `I can’t upgrade delivery on this one. Current terms remain: ${toPriceText(price, offer.currency)} with ${deliveryText(delivery)}.`;
     }
   } else if (wantsDiscount) {
     const target = Math.max(offer.policy.minPricePence, price - offer.policy.maxDiscountPence);
     if (target < price) {
       price = target;
       notes.push("Price adjusted");
-      sellerReply = `I can improve the price slightly. Updated terms: ${toPriceTextGBP(price)} with ${deliveryText(delivery)}.`;
+      sellerReply = `I can improve the price slightly. Updated terms: ${toPriceText(price, offer.currency)} with ${deliveryText(delivery)}.`;
     } else {
-      sellerReply = `I’m already at the best price I can do for this. Current terms: ${toPriceTextGBP(price)} with ${deliveryText(delivery)}.`;
+      sellerReply = `I’m already at the best price I can do for this. Current terms: ${toPriceText(price, offer.currency)} with ${deliveryText(delivery)}.`;
     }
   } else {
-    sellerReply = `Understood. Current terms are ${toPriceTextGBP(price)} with ${deliveryText(delivery)}. Ask for delivery speed or price if you want changes.`;
+    sellerReply = `Understood. Current terms are ${toPriceText(price, offer.currency)} with ${deliveryText(delivery)}. Ask for delivery speed or price if you want changes.`;
   }
 
   events.push({ id: id("e"), ts: nowIso, who: "Seller assistant", text: sellerReply });

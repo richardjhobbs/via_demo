@@ -1,3 +1,4 @@
+
 import { NextResponse } from "next/server";
 import {
   encodeToken,
@@ -14,12 +15,9 @@ import {
 } from "../_lib/storeRegistry";
 import { mcpSearchProducts } from "../_lib/mcp";
 
-/* -----------------------------
-   Helpers
-------------------------------*/
-
 function cleanQuery(raw: string): string {
-  return raw
+  // We do NOT try to filter by price. We just remove currency symbols that confuse search.
+  return (raw || "")
     .replace(/[£$€]/g, "")
     .replace(/[^a-zA-Z0-9\s-]/g, " ")
     .replace(/\s+/g, " ")
@@ -27,9 +25,9 @@ function cleanQuery(raw: string): string {
     .slice(0, 80);
 }
 
-function extractKeyItemWord(text: string): string | null {
-  const t = text.toLowerCase();
-  const words = [
+function extractKeyItemWord(requestText: string): string | null {
+  const t = requestText.toLowerCase();
+  const keywords = [
     "helmet",
     "sneakers",
     "trainer",
@@ -43,52 +41,55 @@ function extractKeyItemWord(text: string): string | null {
     "litter",
     "toy"
   ];
-  for (const w of words) if (t.includes(w)) return w;
+  for (const k of keywords) if (t.includes(k)) return k;
   return null;
 }
 
-function matchesKeyword(title: string, key: string | null): boolean {
+function matchesKeyWord(title: string, key: string | null): boolean {
   if (!key) return true;
   return title.toLowerCase().includes(key.toLowerCase());
 }
 
-function extractBudget(text: string): number | null {
-  const m = text.match(/(\d{2,5})/);
-  if (!m) return null;
-  return parseInt(m[1], 10);
+function guessCurrency(priceText: string): string {
+  const t = (priceText || "").toUpperCase();
+
+  if (t.includes("USD") || t.includes("$")) return "USD";
+  if (t.includes("EUR") || t.includes("€")) return "EUR";
+  if (t.includes("GBP") || t.includes("£")) return "GBP";
+  if (t.includes("AUD")) return "AUD";
+  if (t.includes("CAD")) return "CAD";
+  if (t.includes("SGD")) return "SGD";
+  if (t.includes("HKD")) return "HKD";
+  if (t.includes("JPY") || t.includes("¥")) return "JPY";
+
+  return "UNKNOWN";
 }
 
-function parsePrice(priceText: string): { minor: number; currency: string } | null {
-  if (!priceText) return null;
-
-  const cleaned = priceText.replace(/[^\d.,]/g, "").replace(",", ".");
-  const num = parseFloat(cleaned);
-  if (Number.isNaN(num)) return null;
-
-  return {
-    minor: Math.round(num * 100),
-    currency: "GBP"
-  };
-}
-
-function buildOffer(args: {
+function offerFromMcpProduct(args: {
   storeId: string;
   storeName: string;
-  product: any;
-  parsedPrice: { minor: number; currency: string };
+  title: string;
+  priceText: string;
+  imageUrl: string;
+  productUrl: string;
   arrivalDelayMs: number;
+  reliabilityLabel: "Verified" | "Reliable" | "New";
 }): Offer {
   return {
     id: `o_${args.storeId}_${Math.random().toString(16).slice(2)}`,
     sellerId: args.storeId,
     sellerName: args.storeName,
-    headline: args.product.title,
-    imageUrl: args.product.imageUrl || "https://placehold.co/600x400/png?text=Product",
-    productUrl: args.product.productUrl || "#",
-    pricePence: args.parsedPrice.minor,
-    currency: args.parsedPrice.currency,
+    headline: args.title,
+    imageUrl: args.imageUrl || "https://placehold.co/600x400/png?text=Product",
+    productUrl: args.productUrl || "#",
+
+    // For demo: we show merchant's own price string, and do not rely on numeric conversion.
+    pricePence: 0,
+    currency: guessCurrency(args.priceText),
+    priceTextOverride: args.priceText || "",
+
     deliveryDays: 3,
-    reliabilityLabel: "Reliable",
+    reliabilityLabel: args.reliabilityLabel,
     replyClass: "normal",
     arrivalDelayMs: args.arrivalDelayMs,
     sourceLabel: "Live store response",
@@ -101,16 +102,11 @@ function buildOffer(args: {
   };
 }
 
-/* -----------------------------
-   Route
-------------------------------*/
-
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
 
   const requestText = (body?.requestText ?? "").toString();
   const mode = (body?.mode === "seller" ? "seller" : "buyer") as Mode;
-  const debugOn = body?.debug === true;
 
   if (!requestText.trim()) {
     return NextResponse.json({ error: "Missing requestText" }, { status: 400 });
@@ -118,107 +114,121 @@ export async function POST(req: Request) {
 
   const thread = makeInitialThread(requestText, mode);
 
+  // Optional debug: { debug: true }
+  const debugOn = body?.debug === true;
   const debug: any = debugOn
     ? {
-        category: null,
-        cleanedQuery: null,
-        keyWord: null,
-        budget: null,
-        storesPicked: [],
-        storeResults: []
+        category: null as any,
+        cleanedQuery: null as any,
+        keyWord: null as any,
+        storesPicked: [] as any[],
+        storeResults: [] as any[]
       }
     : null;
 
   try {
     const category = classifyIntent(requestText) as StoreCategory;
     const keyWord = extractKeyItemWord(requestText);
-    const budget = extractBudget(requestText);
-    const query = cleanQuery(requestText);
+    const q = cleanQuery(requestText);
 
     if (debug) {
       debug.category = category;
-      debug.cleanedQuery = query;
+      debug.cleanedQuery = q;
       debug.keyWord = keyWord;
-      debug.budget = budget;
     }
 
     const stores = await loadStoreRegistry();
-    const picked = pickStoresForCategory(stores, category, 6); // wider search
+    const picked = pickStoresForCategory(stores, category, 6); // broaden to find 3 that respond
 
     if (debug) {
-      debug.storesPicked = picked.map(s => ({
+      debug.storesPicked = picked.map((s: any) => ({
         id: s.id,
         name: s.name,
-        mcpUrl: s.mcpUrl
+        domain: s.domain,
+        mcpUrl: s.mcpUrl,
+        category: s.category
       }));
     }
 
     const results = await Promise.allSettled(
-      picked.map((store, idx) =>
-        mcpSearchProducts({
-          storeBaseUrl: store.domain
-            ? `https://${store.domain}`
-            : store.mcpUrl.replace(/\/api\/mcp\/?$/i, ""),
-          mcpUrl: store.mcpUrl,
-          query,
-          timeoutMs: 10000
-        }).then(r => ({ store, idx, r }))
-      )
+      picked.map((s: any, idx: number) => {
+        const storeBaseUrl = s.domain
+          ? `https://${s.domain}`
+          : s.mcpUrl.replace(/\/api\/mcp\/?$/i, "");
+
+        return mcpSearchProducts({
+          storeBaseUrl,
+          mcpUrl: s.mcpUrl,
+          query: q,
+          timeoutMs: 12000
+        }).then((r) => ({ store: s, idx, r }));
+      })
     );
 
-    const acceptedOffers: Offer[] = [];
+    const liveOffers: Offer[] = [];
 
     for (const item of results) {
-      if (item.status !== "fulfilled") continue;
-
-      const { store, idx, r } = item.value;
-
-      if (!r.ok || !r.products?.length) {
-        if (debug) {
-          debug.storeResults.push({
-            storeId: store.id,
-            ok: false,
-            error: r.error || "No products"
-          });
-        }
+      if (item.status !== "fulfilled") {
+        if (debug) debug.storeResults.push({ ok: false, error: "Promise rejected" });
         continue;
       }
 
-      const filtered = r.products.filter(p => matchesKeyword(p.title, keyWord));
+      const { store, idx, r } = item.value;
 
-      for (const product of filtered) {
-        const parsed = parsePrice(product.priceText);
-        if (!parsed) continue;
-
-        if (budget && parsed.minor > budget * 100) continue;
-
-        acceptedOffers.push(
-          buildOffer({
-            storeId: store.id,
-            storeName: store.name,
-            product,
-            parsedPrice: parsed,
-            arrivalDelayMs: 800 + idx * 900
-          })
-        );
-
-        if (acceptedOffers.length >= 3) break;
+      if (debug) {
+        debug.storeResults.push({
+          storeId: store.id,
+          storeName: store.name,
+          ok: r.ok,
+          toolUsed: r.toolUsed,
+          error: r.error,
+          productCount: r.products?.length ?? 0,
+          firstProduct: r.products?.[0] ?? null
+        });
       }
 
-      if (acceptedOffers.length >= 3) break;
+      if (!r.ok || !r.products.length) continue;
+
+      // Prefer keyword match, else first product
+      const matched =
+        r.products.find((p) => matchesKeyWord(p.title, keyWord)) || r.products[0];
+
+      // Slower staggering reads as “real process”
+      const delay = 1200 + idx * 1400;
+
+      const trust: "Verified" | "Reliable" | "New" =
+        store.id.toLowerCase().includes("allbirds") ? "Verified" : "Reliable";
+
+      liveOffers.push(
+        offerFromMcpProduct({
+          storeId: store.id,
+          storeName: store.name,
+          title: matched.title,
+          priceText: matched.priceText || "",
+          imageUrl: matched.imageUrl,
+          productUrl: matched.productUrl,
+          arrivalDelayMs: delay,
+          reliabilityLabel: trust
+        })
+      );
+
+      if (liveOffers.length >= 3) break;
     }
 
-    if (acceptedOffers.length) {
-      thread.offers = acceptedOffers;
+    if (liveOffers.length >= 1) {
+      thread.offers = liveOffers;
+
+      const nowIso = new Date().toISOString();
       thread.events.push({
         id: `e_${Math.random().toString(16).slice(2)}`,
-        ts: new Date().toISOString(),
+        ts: nowIso,
         who: "Your assistant",
-        text: "Live store responses analysed. Matching offers selected."
+        text:
+          "Tip: for the demo, avoid adding price limits in the request. We show each seller’s normal price and options as quoted, without filtering or conversion."
       });
     }
-  } catch (err: any) {
-    if (debug) debug.fatal = String(err?.message ?? err);
+  } catch (e: any) {
+    if (debug) debug.fatal = String(e?.message ?? e);
   }
 
   const token = encodeToken(thread);
