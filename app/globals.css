@@ -517,3 +517,10 @@ html.dark .demo-offer {
   padding: 0.8rem 1rem;
   font-size: 0.9rem;
 }
+/* Force social icon sizing (prevents huge icon render) */
+.social-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+  object-fit: contain;
+}

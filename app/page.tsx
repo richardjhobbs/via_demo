@@ -553,14 +553,22 @@ export default function HomePage() {
       {/* Footer uses the same classes as getvia */}
       <div className="footer-left">© VIA Labs Pte Ltd</div>
       <div className="footer-right">
-        <a href={xUrl} target="_blank" rel="noopener noreferrer" className="social-link" aria-label="VIA on X">
-          <img
-            id="socialIcon"
-            src={xIconSrc}
-            alt="X (Twitter)"
-            className="social-icon"
-          />
-        </a>
+        <a
+  href="https://x.com/via_labs_sg"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="social-link"
+>
+  <img
+    id="socialIcon"
+    src="/images/logo-black.png"
+    alt="X (Twitter)"
+    className="social-icon"
+    data-light="/images/logo-black.png"
+    data-dark="/images/logo-white.png"
+  />
+</a>
+
       </div>
     </>
   );
