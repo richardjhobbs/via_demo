@@ -524,3 +524,26 @@ html.dark .demo-offer {
   display: block;
   object-fit: contain;
 }
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 980px;
+  margin: 40px auto 20px auto;
+  padding: 0 20px;
+}
+
+.footer-left {
+  font-size: 0.9rem;
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
+}
+
+.social-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
