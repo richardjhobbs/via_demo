@@ -63,7 +63,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [pollOn, setPollOn] = useState(false);
 
-  // Set your real X URL here (do not guess)
+  // Replace if needed, do not guess
   const xUrl = "https://x.com/via_labs_sg";
 
   const heroSubtitle = useMemo(() => {
@@ -225,11 +225,11 @@ export default function HomePage() {
     const stage = thread?.kpis?.stageLabel?.toLowerCase() ?? "";
     const offersCount = thread?.kpis?.offersCount ?? 0;
     const hasOfferSelected = Boolean(thread?.selectedOfferId);
-    const confirmed = Boolean(thread?.kpis?.confirmed);
+    const confirmedKpi = Boolean(thread?.kpis?.confirmed);
 
     const stepStatus = (n: number) => {
       if (!thread) return "Pending";
-      if (confirmed) return "Done";
+      if (confirmedKpi) return "Done";
       if (n === 1) return "Done";
       if (n === 2) return stage.includes("broadcast") || offersCount > 0 ? "Active" : "Pending";
       if (n === 3) return offersCount > 0 ? (offersCount >= 3 ? "Done" : "Active") : "Pending";
@@ -247,15 +247,16 @@ export default function HomePage() {
     ];
   }, [thread, intentLine, routingLine]);
 
+  // Correct mapping:
+  // Light mode (day): black icon
+  // Dark mode (night): white icon
   const viaLogoSrc = theme === "dark" ? "/images/VIA_logo_large_white.png" : "/images/VIA_logo_large_black.png";
   const xIconSrc = theme === "dark" ? "/images/logo-white.png" : "/images/logo-black.png";
 
   return (
     <>
-      {/* Uses the same structural hooks as getvia CSS */}
       <header>
         <a href="https://getvia.xyz/index.html" className="logo" aria-label="VIA Home">
-
           <img id="logo" src={viaLogoSrc} alt="VIA Logo" />
         </a>
       </header>
@@ -278,7 +279,6 @@ export default function HomePage() {
         </svg>
       </button>
 
-      {/* main is required for proper centering in your CSS */}
       <main>
         <div className="container">
           <h1>VIA DEMO</h1>
@@ -466,27 +466,12 @@ export default function HomePage() {
                 </>
               )}
 
-              {/* Buttons at the bottom of the right Offers column */}
+              {/* Buttons at the bottom of the right column */}
               <div style={{ marginTop: 16 }}>
                 <div className="demo-controls" style={{ justifyContent: "center" }}>
-                  <button
-                    className={"demo-pill " + (rightTab === "offers" ? "active" : "")}
-                    onClick={() => setRightTab("offers")}
-                  >
-                    Offers
-                  </button>
-                  <button
-                    className={"demo-pill " + (rightTab === "transparency" ? "active" : "")}
-                    onClick={() => setRightTab("transparency")}
-                  >
-                    Transparency
-                  </button>
-                  <button
-                    className={"demo-pill " + (rightTab === "debug" ? "active" : "")}
-                    onClick={() => setRightTab("debug")}
-                  >
-                    Debug
-                  </button>
+                  <button className={"demo-pill " + (rightTab === "offers" ? "active" : "")} onClick={() => setRightTab("offers")}>Offers</button>
+                  <button className={"demo-pill " + (rightTab === "transparency" ? "active" : "")} onClick={() => setRightTab("transparency")}>Transparency</button>
+                  <button className={"demo-pill " + (rightTab === "debug" ? "active" : "")} onClick={() => setRightTab("debug")}>Debug</button>
                 </div>
               </div>
             </div>
@@ -547,42 +532,36 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+
+          {/* Bottom Nav (full getvia nav) */}
+          <nav className="bottom-nav" aria-label="Main navigation">
+            <a href="https://getvia.xyz/buyer.html" className="bottom-nav-link">Buyer</a>
+            <a href="https://getvia.xyz/seller.html" className="bottom-nav-link">Seller</a>
+            <a href="https://getvia.xyz/what-is-via.html" className="bottom-nav-link">FAQ</a>
+            <a href="https://getvia.xyz/paper.html" className="bottom-nav-link">Paper</a>
+            <a href="https://getvia.xyz/proof.html" className="bottom-nav-link">Proof</a>
+            <a href="https://demo.getvia.xyz" className="bottom-nav-link">Demo</a>
+            <a href="https://getvia.xyz/join.html" className="bottom-nav-link">Join</a>
+          </nav>
+
+          {/* Footer: single X link only, no ghost links */}
+          <footer className="site-footer">
+            <div className="demo-footer-left">© VIA Labs Pte Ltd</div>
+
+            <div className="demo-footer-right">
+              <a href={xUrl} target="_blank" rel="noopener noreferrer" className="social-link" aria-label="VIA on X">
+                <img
+                  id="socialIcon"
+                  src={xIconSrc}
+                  alt="X"
+                  className="social-icon"
+                />
+              </a>
+            </div>
+          </footer>
         </div>
       </main>
-<nav className="bottom-nav" aria-label="Main navigation">
-  <a href="https://getvia.xyz/buyer.html" className="bottom-nav-link">Buyer</a>
-  <a href="https://getvia.xyz/seller.html" className="bottom-nav-link">Seller</a>
-  <a href="https://getvia.xyz/what-is-via.html" className="bottom-nav-link">FAQ</a>
-  <a href="https://getvia.xyz/paper.html" className="bottom-nav-link">Paper</a>
-  <a href="https://getvia.xyz/proof.html" className="bottom-nav-link">Proof</a>
-  <a href="https://demo.getvia.xyz" className="bottom-nav-link">Demo</a>
-  <a href="https://getvia.xyz/join.html" className="bottom-nav-link">Join</a>
-</nav>
-
-      {/* Footer uses the same classes as getvia */}
-      <footer className="site-footer">
-  <div className="footer-left">
-    © VIA Labs Pte Ltd
-  </div>
-
-  <div className="footer-right">
-    <a
-      href="https://x.com/via_labs_sg"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="social-link"
-    >
-      <img
-        id="socialIcon"
-        src="/images/logo-white.png"
-        alt="X"
-        className="social-icon"
-        data-light="/images/logo-black.png"
-        data-dark="/images/logo-white.png"
-      />
-    </a>
-  </div>
-</footer>
     </>
   );
 }
+
