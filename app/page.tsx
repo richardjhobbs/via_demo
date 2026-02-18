@@ -4,47 +4,44 @@ import { useEffect, useMemo, useState } from "react";
 
 type Offer = {
   id: string;
-  sellerName: string;
-  headline: string;
-  imageUrl: string;
-  productUrl: string;
-  sourceLabel: string;
-  priceText: string;
-  deliveryText: string;
-  reliabilityLabel: "Verified" | "Reliable" | "New";
-  fastReplyLabel: "Replies fast" | "Normal reply";
+  sellerName?: string;
+  headline?: string;
+  imageUrl?: string;
+  productUrl?: string;
+  priceText?: string;
+  deliveryText?: string;
+  sourceLabel?: string;
 };
 
 type ThreadEvent = {
   id: string;
   ts: string;
-  who: "You" | "Your assistant" | "Seller assistant";
+  who?: string;
   text: string;
 };
 
 type ThreadState = {
   threadId: string;
-  status: string;
-  requestText: string;
+  status?: string;
   selectedOfferId?: string | null;
   offers: Offer[];
   events: ThreadEvent[];
-  kpis: {
-    elapsedSeconds?: number | null;
-    offersCount: number;
-    stageLabel: string;
-    confirmed: boolean;
+  token: string;
+  kpis?: {
+    stageLabel?: string;
+    confirmed?: boolean;
+    offersCount?: number;
     category?: string;
   };
-  token: string;
   debug?: any;
 };
 
 function getInitialTheme(): "light" | "dark" {
-  if (typeof window === "undefined") return "light";
+  if (typeof window === "undefined") return "dark";
   const saved = window.localStorage.getItem("via_demo_theme");
   if (saved === "dark" || saved === "light") return saved;
-  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const prefersDark =
+    window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
   return prefersDark ? "dark" : "light";
 }
 
@@ -54,21 +51,19 @@ function applyTheme(theme: "light" | "dark") {
   else document.documentElement.classList.remove("dark");
 }
 
-export default function HomePage() {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [rightTab, setRightTab] = useState<"offers" | "transparency" | "debug">("offers");
+export default function Page() {
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [tab, setTab] = useState<"offers" | "transparency" | "debug">("offers");
 
   const [requestText, setRequestText] = useState("");
   const [thread, setThread] = useState<ThreadState | null>(null);
   const [loading, setLoading] = useState(false);
   const [pollOn, setPollOn] = useState(false);
 
-  // Replace if needed, do not guess
   const xUrl = "https://x.com/via_labs_sg";
 
-  const heroSubtitle = useMemo(() => {
-    return "Live agent-to-agent commerce demo. Intent is interpreted, broadcast to merchants, responses arrive, negotiation happens, you confirm. See all NOTES below!";
-  }, []);
+  const heroSubtitle =
+    "Live agent-to-agent commerce demo. Intent is interpreted, broadcast to merchants, responses arrive, negotiation happens, you confirm. See all NOTES below!";
 
   const notesText = useMemo(() => {
     return (
@@ -98,7 +93,7 @@ export default function HomePage() {
     setRequestText("");
     setThread(null);
     setPollOn(false);
-    setRightTab("offers");
+    setTab("offers");
   }
 
   async function createThread() {
@@ -115,27 +110,29 @@ export default function HomePage() {
         body: JSON.stringify({ requestText: txt })
       });
 
-      if (!res.ok) throw new Error("Failed to start demo");
-      const data = await res.json();
+      if (!res.ok) throw new Error("Failed to start demo thread");
+      const data = (await res.json()) as ThreadState;
+
       setThread(data);
       setPollOn(true);
-      setRightTab("offers");
+      setTab("offers");
     } finally {
       setLoading(false);
     }
   }
 
-  async function pollThread(t: ThreadState) {
-    const res = await fetch(`/api/demo/thread/${t.threadId}`, {
+  async function pollThread(current: ThreadState) {
+    const res = await fetch(`/api/demo/thread/${current.threadId}`, {
       cache: "no-store",
-      headers: { "x-demo-token": t.token }
+      headers: { "x-demo-token": current.token }
     });
-    if (!res.ok) return;
 
-    const data = await res.json();
+    if (!res.ok) return;
+    const data = (await res.json()) as ThreadState;
     setThread(data);
 
-    if ((data?.kpis?.offersCount ?? 0) >= 3) setPollOn(false);
+    const offersCount = data?.kpis?.offersCount ?? data?.offers?.length ?? 0;
+    if (offersCount >= 3) setPollOn(false);
     if (data?.kpis?.confirmed) setPollOn(false);
   }
 
@@ -160,10 +157,11 @@ export default function HomePage() {
         },
         body: JSON.stringify({ offerId })
       });
+
       if (!res.ok) throw new Error("Failed to select offer");
-      const data = await res.json();
+      const data = (await res.json()) as ThreadState;
       setThread(data);
-      setRightTab("transparency");
+      setTab("transparency");
     } finally {
       setLoading(false);
     }
@@ -184,8 +182,9 @@ export default function HomePage() {
         },
         body: JSON.stringify({ text: msg })
       });
+
       if (!res.ok) throw new Error("Failed to send message");
-      const data = await res.json();
+      const data = (await res.json()) as ThreadState;
       setThread(data);
       setPollOn(true);
     } finally {
@@ -202,8 +201,9 @@ export default function HomePage() {
         method: "POST",
         headers: { "x-demo-token": thread.token }
       });
+
       if (!res.ok) throw new Error("Failed to confirm");
-      const data = await res.json();
+      const data = (await res.json()) as ThreadState;
       setThread(data);
       setPollOn(false);
     } finally {
@@ -211,57 +211,60 @@ export default function HomePage() {
     }
   }
 
-  const intentLine =
-    thread?.kpis?.category
-      ? `Detected category: ${thread.kpis.category}`
-      : "Detected category: pending";
+  const stageLabel = thread?.kpis?.stageLabel ?? "Waiting for request";
+  const categoryLabel = thread?.kpis?.category ?? "pending";
+  const offersCount = thread?.kpis?.offersCount ?? thread?.offers?.length ?? 0;
+  const confirmed = Boolean(thread?.kpis?.confirmed);
+  const offerSelected = Boolean(thread?.selectedOfferId);
 
-  const routingLine =
-    thread?.kpis?.category
-      ? `Broadcasting into ${thread.kpis.category} stores.`
-      : "Broadcasting into participating stores.";
+  const viaLogoSrc =
+    theme === "dark" ? "/images/VIA_logo_large_white.png" : "/images/VIA_logo_large_black.png";
 
-  const timeline = useMemo(() => {
-    const stage = thread?.kpis?.stageLabel?.toLowerCase() ?? "";
-    const offersCount = thread?.kpis?.offersCount ?? 0;
-    const hasOfferSelected = Boolean(thread?.selectedOfferId);
-    const confirmedKpi = Boolean(thread?.kpis?.confirmed);
+  const xIconSrc =
+    theme === "dark" ? "/images/logo-white.png" : "/images/logo-black.png";
 
-    const stepStatus = (n: number) => {
-      if (!thread) return "Pending";
-      if (confirmedKpi) return "Done";
-      if (n === 1) return "Done";
-      if (n === 2) return stage.includes("broadcast") || offersCount > 0 ? "Active" : "Pending";
-      if (n === 3) return offersCount > 0 ? (offersCount >= 3 ? "Done" : "Active") : "Pending";
-      if (n === 4) return hasOfferSelected ? "Active" : "Pending";
-      if (n === 5) return thread.status === "AGREED" ? "Active" : "Pending";
-      return "Pending";
-    };
-
-    return [
-      { n: 1, title: "Interpret intent", desc: thread ? intentLine : "Waiting for your request.", status: stepStatus(1) },
-      { n: 2, title: "Broadcast to merchants", desc: thread ? routingLine : "Waiting.", status: stepStatus(2) },
-      { n: 3, title: "Collect responses", desc: thread ? `${offersCount} offer(s) received.` : "Waiting.", status: stepStatus(3) },
-      { n: 4, title: "Negotiate", desc: thread ? (thread.selectedOfferId ? "Negotiation open on selected offer." : "Select an offer to begin.") : "Select an offer to begin.", status: stepStatus(4) },
-      { n: 5, title: "Confirm", desc: thread ? (thread.kpis.confirmed ? "Confirmed." : "Final step always requires buyer approval.") : "Final step always requires buyer approval.", status: stepStatus(5) }
-    ];
-  }, [thread, intentLine, routingLine]);
-
-  // Correct mapping:
-  // Light mode (day): black icon
-  // Dark mode (night): white icon
-  const viaLogoSrc = theme === "dark" ? "/images/VIA_logo_large_white.png" : "/images/VIA_logo_large_black.png";
-  const xIconSrc = theme === "dark" ? "/images/logo-white.png" : "/images/logo-black.png";
+  const timeline = [
+    {
+      n: 1,
+      title: "Interpret intent",
+      status: thread ? "Done" : "Pending",
+      desc: thread ? `Detected category: ${categoryLabel}` : "Waiting for your request."
+    },
+    {
+      n: 2,
+      title: "Broadcast to merchants",
+      status: thread ? (offersCount > 0 ? "Active" : "Pending") : "Pending",
+      desc: thread ? "Broadcasting to multiple merchants." : "Waiting."
+    },
+    {
+      n: 3,
+      title: "Collect responses",
+      status: offersCount > 0 ? (offersCount >= 3 ? "Done" : "Active") : "Pending",
+      desc: thread ? `${offersCount} offer(s) received.` : "Waiting."
+    },
+    {
+      n: 4,
+      title: "Negotiate",
+      status: offerSelected ? "Active" : "Pending",
+      desc: offerSelected ? "Negotiation open on selected offer." : "Select an offer to begin."
+    },
+    {
+      n: 5,
+      title: "Confirm",
+      status: confirmed ? "Done" : "Pending",
+      desc: confirmed ? "Confirmed." : "Final step always requires buyer approval."
+    }
+  ];
 
   return (
     <>
       <header>
         <a href="https://getvia.xyz/index.html" className="logo" aria-label="VIA Home">
-          <img id="logo" src={viaLogoSrc} alt="VIA Logo" />
+          <img id="logo" src={viaLogoSrc} alt="VIA" />
         </a>
       </header>
 
-      <button className="theme-toggle" aria-label="Toggle dark/light mode" onClick={toggleTheme}>
+      <button className="theme-toggle" aria-label="Toggle day/night" onClick={toggleTheme}>
         <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="5"></circle>
           <line x1="12" y1="1" x2="12" y2="3"></line>
@@ -296,32 +299,26 @@ export default function HomePage() {
                 Describe what you want. The assistant interprets intent, broadcasts to multiple merchants, collects responses, negotiates, and you approve the final step.
               </p>
 
-              <div style={{ marginTop: 12 }}>
-                <textarea
-                  value={requestText}
-                  onChange={(e) => setRequestText(e.target.value)}
-                  placeholder={'Try: "Cycling helmet size M, breathable"\nOr: "Dog treats, grain free, deliver this week"'}
-                  rows={6}
-                  style={{ width: "100%", resize: "vertical" }}
-                />
+              <textarea
+                value={requestText}
+                onChange={(e) => setRequestText(e.target.value)}
+                placeholder={'Try: "Cycling helmet size M, breathable"\nOr: "Dog treats, grain free, deliver this week"'}
+                rows={7}
+                style={{ width: "100%", resize: "vertical", marginTop: 12 }}
+              />
 
-                <div style={{ marginTop: 10 }}>
-                  <button
-                    className="cta-button"
-                    disabled={loading || requestText.trim().length === 0}
-                    onClick={createThread}
-                    style={{ width: "100%" }}
-                  >
-                    {loading ? "Working..." : "Send request"}
-                  </button>
-                </div>
-              </div>
+              <button
+                className="cta-button"
+                disabled={loading || requestText.trim().length === 0}
+                onClick={createThread}
+                style={{ width: "100%", marginTop: 12 }}
+              >
+                {loading ? "Working..." : "Send request"}
+              </button>
 
-              <div style={{ height: 16 }} />
-
-              <div className="content-section">
+              <div className="content-section" style={{ marginTop: 16 }}>
                 <h3>Orchestration</h3>
-                <p><b>Current phase:</b> {thread ? thread.kpis.stageLabel : "Waiting for request"}</p>
+                <p><b>Current phase:</b> {stageLabel}</p>
                 <p style={{ opacity: 0.8 }}>
                   This is a live demo pulling real data from real stores to show agent coordination.
                 </p>
@@ -343,7 +340,7 @@ export default function HomePage() {
 
             {/* RIGHT COLUMN */}
             <div className="card">
-              {rightTab === "offers" && (
+              {tab === "offers" && (
                 <>
                   <div className="demo-section-title">
                     <h2>Offers</h2>
@@ -357,30 +354,37 @@ export default function HomePage() {
                     </div>
                   )}
 
-                  {thread && thread.offers.map((o) => (
+                  {thread && (thread.offers ?? []).map((o) => (
                     <div className="demo-offer" key={o.id}>
                       <div className="demo-offer-top">
-                        <img className="demo-offer-img" src={o.imageUrl} alt={o.headline} />
+                        {o.imageUrl ? (
+                          <img className="demo-offer-img" src={o.imageUrl} alt={o.headline ?? "Offer"} />
+                        ) : null}
+
                         <div style={{ flex: 1 }}>
-                          <div className="demo-offer-title">{o.headline}</div>
-                          <div className="demo-muted">{o.priceText} , {o.deliveryText}</div>
-
-                          <div className="demo-badges">
-                            <span className={"demo-badge " + (o.reliabilityLabel === "Verified" ? "good" : "")}>
-                              {o.reliabilityLabel}
-                            </span>
-                            <span className="demo-badge">{o.fastReplyLabel}</span>
-                            <span className="demo-badge">{o.sellerName}</span>
-                            <span className="demo-badge">{o.sourceLabel}</span>
+                          <div className="demo-offer-title">{o.headline ?? "Offer"}</div>
+                          <div className="demo-muted">
+                            {(o.priceText ?? "Price varies")} , {(o.deliveryText ?? "Delivery varies")}
                           </div>
 
-                          <div style={{ marginTop: 10 }}>
-                            <a href={o.productUrl} target="_blank" rel="noreferrer">View product</a>
+                          <div className="demo-badges" style={{ marginTop: 8 }}>
+                            {o.sellerName ? <span className="demo-badge">{o.sellerName}</span> : null}
+                            {o.sourceLabel ? <span className="demo-badge">{o.sourceLabel}</span> : null}
                           </div>
+
+                          {o.productUrl ? (
+                            <div style={{ marginTop: 10 }}>
+                              <a href={o.productUrl} target="_blank" rel="noreferrer">View product</a>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
 
-                      <button className="cta-button" onClick={() => selectOffer(o.id)} disabled={loading || thread.kpis.confirmed}>
+                      <button
+                        className="cta-button"
+                        onClick={() => selectOffer(o.id)}
+                        disabled={loading || confirmed}
+                      >
                         {thread.selectedOfferId === o.id ? "Selected" : "Select and negotiate"}
                       </button>
                     </div>
@@ -388,7 +392,7 @@ export default function HomePage() {
                 </>
               )}
 
-              {rightTab === "transparency" && (
+              {tab === "transparency" && (
                 <>
                   <div className="demo-section-title">
                     <h2>Transparency</h2>
@@ -405,26 +409,22 @@ export default function HomePage() {
                   {thread && (
                     <>
                       <div className="demo-item">
-                        <div className="demo-meta"><span>Intent</span><span>{thread.kpis.category ?? "pending"}</span></div>
+                        <div className="demo-meta"><span>Intent</span><span>{categoryLabel}</span></div>
                         <div className="demo-text">Request is classified, then broadcast to multiple merchants in the matched category.</div>
                       </div>
 
                       <div className="demo-item">
-                        <div className="demo-meta"><span>Responses</span><span>{thread.kpis.offersCount}/3</span></div>
-                        <div className="demo-text">Merchant responses are normalised into comparable offer objects.</div>
+                        <div className="demo-meta"><span>Responses</span><span>{offersCount}/3</span></div>
+                        <div className="demo-text">Merchant responses are normalised into comparable offers.</div>
                       </div>
 
                       <div className="demo-item">
-                        <div className="demo-meta"><span>Negotiation</span><span>{thread.selectedOfferId ? "Open" : "Not started"}</span></div>
-                        <div className="demo-text">
-                          {thread.selectedOfferId
-                            ? "One offer is selected. Messages now target that merchant thread until you confirm."
-                            : "Select an offer to begin negotiation."}
-                        </div>
+                        <div className="demo-meta"><span>Negotiation</span><span>{offerSelected ? "Open" : "Not started"}</span></div>
+                        <div className="demo-text">{offerSelected ? "Selected offer is now the active thread." : "Select an offer to begin."}</div>
                       </div>
 
                       <div className="demo-item">
-                        <div className="demo-meta"><span>Confirmation</span><span>{thread.kpis.confirmed ? "Confirmed" : "Pending"}</span></div>
+                        <div className="demo-meta"><span>Confirmation</span><span>{confirmed ? "Confirmed" : "Pending"}</span></div>
                         <div className="demo-text">Final step always requires explicit buyer approval.</div>
                       </div>
                     </>
@@ -432,7 +432,7 @@ export default function HomePage() {
                 </>
               )}
 
-              {rightTab === "debug" && (
+              {tab === "debug" && (
                 <>
                   <div className="demo-section-title">
                     <h2>Debug</h2>
@@ -453,7 +453,7 @@ export default function HomePage() {
                         {JSON.stringify(
                           {
                             status: thread.status,
-                            kpis: thread.kpis,
+                            kpis: thread.kpis ?? null,
                             selectedOfferId: thread.selectedOfferId ?? null,
                             debug: thread.debug ?? null
                           },
@@ -466,12 +466,12 @@ export default function HomePage() {
                 </>
               )}
 
-              {/* Buttons at the bottom of the right column */}
+              {/* Tabs at bottom of right column */}
               <div style={{ marginTop: 16 }}>
                 <div className="demo-controls" style={{ justifyContent: "center" }}>
-                  <button className={"demo-pill " + (rightTab === "offers" ? "active" : "")} onClick={() => setRightTab("offers")}>Offers</button>
-                  <button className={"demo-pill " + (rightTab === "transparency" ? "active" : "")} onClick={() => setRightTab("transparency")}>Transparency</button>
-                  <button className={"demo-pill " + (rightTab === "debug" ? "active" : "")} onClick={() => setRightTab("debug")}>Debug</button>
+                  <button className={"demo-pill " + (tab === "offers" ? "active" : "")} onClick={() => setTab("offers")}>Offers</button>
+                  <button className={"demo-pill " + (tab === "transparency" ? "active" : "")} onClick={() => setTab("transparency")}>Transparency</button>
+                  <button className={"demo-pill " + (tab === "debug" ? "active" : "")} onClick={() => setTab("debug")}>Debug</button>
                 </div>
               </div>
             </div>
@@ -480,7 +480,7 @@ export default function HomePage() {
             <div className="card" style={{ gridColumn: "1 / -1" }}>
               <div className="demo-section-title">
                 <h2>Conversation</h2>
-                <span className="demo-smalllink">{thread ? `Status: ${thread.status}` : "Not started"}</span>
+                <span className="demo-smalllink">{thread ? (thread.status ?? "Active") : "Not started"}</span>
               </div>
 
               {!thread && (
@@ -490,10 +490,10 @@ export default function HomePage() {
                 </div>
               )}
 
-              {thread && thread.events.map((e) => (
+              {thread && (thread.events ?? []).map((e) => (
                 <div className="demo-item" key={e.id}>
                   <div className="demo-meta">
-                    <span>{e.who}</span>
+                    <span>{e.who ?? "Agent"}</span>
                     <span>{new Date(e.ts).toLocaleTimeString()}</span>
                   </div>
                   <div className="demo-text">{e.text}</div>
@@ -508,7 +508,7 @@ export default function HomePage() {
                       const text = window.prompt("Ask for an adjustment or clarification:");
                       if (text) sendMessage(text);
                     }}
-                    disabled={loading || !thread.selectedOfferId || thread.kpis.confirmed}
+                    disabled={loading || !offerSelected || confirmed}
                   >
                     Ask a follow-up
                   </button>
@@ -516,7 +516,7 @@ export default function HomePage() {
                   <button
                     className="cta-button"
                     onClick={confirm}
-                    disabled={loading || thread.status !== "AGREED" || thread.kpis.confirmed}
+                    disabled={loading || thread.status !== "AGREED" || confirmed}
                   >
                     Confirm
                   </button>
@@ -527,41 +527,31 @@ export default function HomePage() {
             {/* NOTES full width */}
             <div className="content-section" style={{ gridColumn: "1 / -1" }}>
               <h3>NOTES</h3>
-              <div style={{ whiteSpace: "pre-wrap", opacity: 0.9 }}>
-                {notesText}
-              </div>
+              <div style={{ whiteSpace: "pre-wrap", opacity: 0.9 }}>{notesText}</div>
             </div>
           </div>
-
-          {/* Bottom Nav (full getvia nav) */}
-          <nav className="bottom-nav" aria-label="Main navigation">
-            <a href="https://getvia.xyz/buyer.html" className="bottom-nav-link">Buyer</a>
-            <a href="https://getvia.xyz/seller.html" className="bottom-nav-link">Seller</a>
-            <a href="https://getvia.xyz/what-is-via.html" className="bottom-nav-link">FAQ</a>
-            <a href="https://getvia.xyz/paper.html" className="bottom-nav-link">Paper</a>
-            <a href="https://getvia.xyz/proof.html" className="bottom-nav-link">Proof</a>
-            <a href="https://demo.getvia.xyz" className="bottom-nav-link">Demo</a>
-            <a href="https://getvia.xyz/join.html" className="bottom-nav-link">Join</a>
-          </nav>
-
-          {/* Footer: single X link only, no ghost links */}
-          <footer className="site-footer">
-            <div className="demo-footer-left">© VIA Labs Pte Ltd</div>
-
-            <div className="demo-footer-right">
-              <a href={xUrl} target="_blank" rel="noopener noreferrer" className="social-link" aria-label="VIA on X">
-                <img
-                  id="socialIcon"
-                  src={xIconSrc}
-                  alt="X"
-                  className="social-icon"
-                />
-              </a>
-            </div>
-          </footer>
         </div>
       </main>
+
+      {/* Fixed bottom nav (styled by CSS, like getvia) */}
+      <nav className="bottom-nav" aria-label="Main navigation">
+        <a href="https://getvia.xyz/buyer.html" className="bottom-nav-link">Buyer</a>
+        <a href="https://getvia.xyz/seller.html" className="bottom-nav-link">Seller</a>
+        <a href="https://getvia.xyz/what-is-via.html" className="bottom-nav-link">FAQ</a>
+        <a href="https://getvia.xyz/paper.html" className="bottom-nav-link">Paper</a>
+        <a href="https://getvia.xyz/proof.html" className="bottom-nav-link">Proof</a>
+        <a href="https://demo.getvia.xyz" className="bottom-nav-link">Demo</a>
+        <a href="https://getvia.xyz/join.html" className="bottom-nav-link">Join</a>
+      </nav>
+
+      {/* Fixed corner footer items */}
+      <div className="corner-left">© VIA Labs Pte Ltd</div>
+
+      <div className="corner-right">
+        <a href={xUrl} target="_blank" rel="noopener noreferrer" className="social-link" aria-label="VIA on X">
+          <img id="socialIcon" src={xIconSrc} alt="X" className="social-icon" />
+        </a>
+      </div>
     </>
   );
 }
-
