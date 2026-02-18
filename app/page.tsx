@@ -559,14 +559,14 @@ export default function HomePage() {
   rel="noopener noreferrer"
   className="social-link"
 >
-  <img
-    id="socialIcon"
-    src="/images/logo-black.png"
-    alt="X (Twitter)"
-    className="social-icon"
-    data-light="/images/logo-black.png"
-    data-dark="/images/logo-white.png"
-  />
+<img
+  id="socialIcon"
+  src="/images/logo-white.png"
+  alt="X (Twitter)"
+  className="social-icon"
+  data-light="/images/logo-black.png"
+  data-dark="/images/logo-white.png"
+/>
 </a>
 
       </div>
