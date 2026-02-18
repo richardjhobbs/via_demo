@@ -70,9 +70,10 @@ export default function Page() {
       "This is a visualization of part of what happens behind the scenes when agentic commerce takes place. " +
       "It shows intent being distributed, and merchant agents (these are actual retail operators) offering products " +
       "through the MCP server and NOSTR relay constructed as part of the VIA protocol.\n\n" +
-      "For the purposes of this demo, merchants and categories are restricted to:\n" +
+      "For the purposes of this demo, merchants and categories are restricted to:\n\n" +
+  
       "SNEAKERS\nOUTDOORS\nCYCLING\nPET SUPPLIES\n\n" +
-      "There are no pricing parameters. Feel free to test and see the process at work."
+      "There are no pricing parameters. Feel free to test and see the process at work. There will be errors!"
     );
   }, []);
 
@@ -296,7 +297,7 @@ export default function Page() {
               </div>
 
               <p style={{ marginTop: 10 }}>
-                Describe what you want. The assistant interprets intent, broadcasts to multiple merchants, collects responses, negotiates, and you approve the final step.
+                Keep it simple.Describe what you want. The assistant interprets intent and broadcasts to multiple merchants, collects responses, negotiates, before you approve any final step.
               </p>
 
               <textarea
