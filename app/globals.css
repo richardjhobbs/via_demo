@@ -60,7 +60,7 @@ body {
   transition: background-color var(--transition-normal), color var(--transition-normal);
 
   /* important: leave room for fixed footer + nav */
-  padding-bottom: 4.5rem;
+  padding-bottom: 2rem;
 }
 
 html.dark body {
@@ -441,17 +441,14 @@ html.dark .demo-item {
    BOTTOM NAV (button style, FIXED at bottom center)
    ========================= */
 .bottom-nav {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: 14px;
   display: flex;
   justify-content: center;
   gap: 0.75rem;
   flex-wrap: wrap;
-  z-index: 45;
-  pointer-events: auto;
+  margin-top: 3rem;
+  margin-bottom: 2rem;
 }
+
 
 .bottom-nav-link {
   text-decoration: none;

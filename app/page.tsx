@@ -531,28 +531,25 @@ export default function Page() {
               <div style={{ whiteSpace: "pre-wrap", opacity: 0.9 }}>{notesText}</div>
             </div>
           </div>
-        </div>
-      </main>
+        </div> {/* end container */}
+    </main>
 
-      {/* Fixed bottom nav (styled by CSS, like getvia) */}
-      <nav className="bottom-nav" aria-label="Main navigation">
-        <a href="https://getvia.xyz/buyer.html" className="bottom-nav-link">Buyer</a>
-        <a href="https://getvia.xyz/seller.html" className="bottom-nav-link">Seller</a>
-        <a href="https://getvia.xyz/what-is-via.html" className="bottom-nav-link">FAQ</a>
-        <a href="https://getvia.xyz/paper.html" className="bottom-nav-link">Paper</a>
-        <a href="https://getvia.xyz/proof.html" className="bottom-nav-link">Proof</a>
-        <a href="https://demo.getvia.xyz" className="bottom-nav-link">Demo</a>
-        <a href="https://getvia.xyz/join.html" className="bottom-nav-link">Join</a>
-      </nav>
+    <nav className="bottom-nav" aria-label="Main navigation">
+      <a href="https://getvia.xyz/buyer.html" className="bottom-nav-link">Buyer</a>
+      <a href="https://getvia.xyz/seller.html" className="bottom-nav-link">Seller</a>
+      <a href="https://getvia.xyz/what-is-via.html" className="bottom-nav-link">FAQ</a>
+      <a href="https://getvia.xyz/paper.html" className="bottom-nav-link">Paper</a>
+      <a href="https://getvia.xyz/proof.html" className="bottom-nav-link">Proof</a>
+      <a href="https://demo.getvia.xyz" className="bottom-nav-link">Demo</a>
+      <a href="https://getvia.xyz/join.html" className="bottom-nav-link">Join</a>
+    </nav>
 
-      {/* Fixed corner footer items */}
-      <div className="corner-left">© VIA Labs Pte Ltd</div>
-
-      <div className="corner-right">
-        <a href={xUrl} target="_blank" rel="noopener noreferrer" className="social-link" aria-label="VIA on X">
-          <img id="socialIcon" src={xIconSrc} alt="X" className="social-icon" />
-        </a>
-      </div>
+    <div className="corner-left">© VIA Labs Pte Ltd</div>
+    <div className="corner-right">
+      <a href="https://x.com/via_labs_sg" target="_blank" rel="noopener noreferrer" className="social-link">
+        <img src="/images/logo-white.png" className="social-icon" alt="X" />
+      </a>
+    </div>
     </>
   );
 }
