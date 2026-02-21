@@ -540,7 +540,7 @@ export default function Page() {
               >
                 {miniTurns.length === 0 ? (
                   <div style={{ opacity: 0.85 }}>
-                    <b>Agent:</b> Tell me what you want. I will clarify, then broadcast.
+                    <b>Agent:</b> Let me knowwhat you might be looking for then let's clarify, then broadcast.
                   </div>
                 ) : (
                   miniTurns.map((t, i) => (
@@ -620,7 +620,7 @@ export default function Page() {
                   {!thread && (
                     <div className="content-section">
                       <h3>No offers yet</h3>
-                      <p>Send a request to broadcast to merchants and see responses arrive.</p>
+                      <p>Send a request to the agent and see responses arrive.</p>
                     </div>
                   )}
 
