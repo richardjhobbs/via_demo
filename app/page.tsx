@@ -214,7 +214,10 @@ export default function Page() {
     setClarifyWorking(true);
     setStatusLabel("Clarifying");
 
-    const historyForApi: MiniTurn[] = [...miniTurns, { role: "user", content: txt }].slice(-12);
+    // IMPORTANT: keep role as literal union members for TS build
+    const historyForApi: MiniTurn[] = [...miniTurns, { role: "user" as const, content: txt }].slice(
+      -12
+    );
     setMiniTurns(historyForApi);
 
     try {
@@ -232,7 +235,7 @@ export default function Page() {
           [
             ...prev,
             {
-              role: "assistant",
+              role: "assistant" as const,
               content:
                 "LLM assist is not available right now. Switch LLM assist off to broadcast directly."
             }
@@ -252,9 +255,8 @@ export default function Page() {
           [
             ...prev,
             {
-              role: "assistant",
-              content:
-                "LLM returned an invalid plan. Switch LLM assist off to broadcast directly."
+              role: "assistant" as const,
+              content: "LLM returned an invalid plan. Switch LLM assist off to broadcast directly."
             }
           ].slice(-12)
         );
@@ -269,7 +271,9 @@ export default function Page() {
 
       if (nextAction === "ASK_ONE_QUESTION" && plan.next_question) {
         setMiniTurns((prev) =>
-          [...prev, { role: "assistant", content: `${header} ${plan.next_question}` }].slice(-12)
+          [...prev, { role: "assistant" as const, content: `${header} ${plan.next_question}` }].slice(
+            -12
+          )
         );
         setStatusLabel("Clarifying");
         setDraft("");
@@ -277,7 +281,7 @@ export default function Page() {
       }
 
       setMiniTurns((prev) =>
-        [...prev, { role: "assistant", content: `${header} Broadcasting now.` }].slice(-12)
+        [...prev, { role: "assistant" as const, content: `${header} Broadcasting now.` }].slice(-12)
       );
       setStatusLabel("Broadcasting");
       setDraft("");
@@ -323,7 +327,6 @@ export default function Page() {
       const elapsed = Date.now() - broadcastStartedAt;
 
       if (offersNow > 0) {
-        // Offers arrived, do not show "no offers"
         setBroadcastTimedOut(false);
         return;
       }
@@ -381,7 +384,6 @@ export default function Page() {
       setThread(data);
       setPollOn(true);
 
-      // New merchant work started, reset the "no offers" window
       setBroadcastStartedAt(Date.now());
       setBroadcastTimedOut(false);
     } finally {
@@ -461,7 +463,13 @@ export default function Page() {
       </header>
 
       <button className="theme-toggle" aria-label="Toggle day/night" onClick={toggleTheme}>
-        <svg className="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg
+          className="sun-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
           <circle cx="12" cy="12" r="5"></circle>
           <line x1="12" y1="1" x2="12" y2="3"></line>
           <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -473,7 +481,13 @@ export default function Page() {
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
         </svg>
 
-        <svg className="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg
+          className="moon-icon"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
         </svg>
       </button>
@@ -494,7 +508,8 @@ export default function Page() {
               </div>
 
               <p style={{ marginTop: 10 }}>
-                Describe what you want. If LLM assist is ON, you will answer one short question, sometimes two, then the request broadcasts automatically.
+                Describe what you want. If LLM assist is ON, you will answer one short question,
+                sometimes two, then the request broadcasts automatically.
               </p>
 
               <div className="demo-controls" style={{ marginTop: 12, gap: 10 }}>
@@ -507,7 +522,9 @@ export default function Page() {
                   LLM assist: {llmOn ? "ON" : "OFF"}
                 </button>
 
-                <span className="demo-badge">{catLabel(intentPlan?.category ?? "NOT_SPECIFIED")}</span>
+                <span className="demo-badge">
+                  {catLabel(intentPlan?.category ?? "NOT_SPECIFIED")}
+                </span>
               </div>
 
               <div
@@ -618,8 +635,9 @@ export default function Page() {
                     <div className="content-section">
                       <h3>No matching offers</h3>
                       <p>
-                        Sorry, none of our currently registered merchants has product like this in stock at the moment.
-                        We are adding new suppliers so check back soon or look for something else!
+                        Sorry, none of our currently registered merchants has product like this in
+                        stock at the moment. We are adding new suppliers so check back soon or look
+                        for something else!
                       </p>
                     </div>
                   )}
@@ -629,7 +647,11 @@ export default function Page() {
                       <div className="demo-offer" key={o.id}>
                         <div className="demo-offer-top">
                           {o.imageUrl ? (
-                            <img className="demo-offer-img" src={o.imageUrl} alt={o.headline ?? "Offer"} />
+                            <img
+                              className="demo-offer-img"
+                              src={o.imageUrl}
+                              alt={o.headline ?? "Offer"}
+                            />
                           ) : null}
 
                           <div style={{ flex: 1 }}>
@@ -653,7 +675,11 @@ export default function Page() {
                           </div>
                         </div>
 
-                        <button className="cta-button" onClick={() => selectOffer(o.id)} disabled={loading || confirmed}>
+                        <button
+                          className="cta-button"
+                          onClick={() => selectOffer(o.id)}
+                          disabled={loading || confirmed}
+                        >
                           {thread.selectedOfferId === o.id ? "Selected" : "Select and negotiate"}
                         </button>
                       </div>
@@ -777,7 +803,10 @@ export default function Page() {
 
               <div style={{ marginTop: 16 }}>
                 <div className="demo-controls" style={{ justifyContent: "center" }}>
-                  <button className={"demo-pill " + (tab === "offers" ? "active" : "")} onClick={() => setTab("offers")}>
+                  <button
+                    className={"demo-pill " + (tab === "offers" ? "active" : "")}
+                    onClick={() => setTab("offers")}
+                  >
                     Offers
                   </button>
                   <button
@@ -786,7 +815,10 @@ export default function Page() {
                   >
                     Transparency
                   </button>
-                  <button className={"demo-pill " + (tab === "debug" ? "active" : "")} onClick={() => setTab("debug")}>
+                  <button
+                    className={"demo-pill " + (tab === "debug" ? "active" : "")}
+                    onClick={() => setTab("debug")}
+                  >
                     Debug
                   </button>
                 </div>
@@ -834,7 +866,11 @@ export default function Page() {
                     Ask a follow-up
                   </button>
 
-                  <button className="cta-button" onClick={confirm} disabled={loading || thread.status !== "AGREED" || confirmed}>
+                  <button
+                    className="cta-button"
+                    onClick={confirm}
+                    disabled={loading || thread.status !== "AGREED" || confirmed}
+                  >
                     Confirm
                   </button>
                 </div>
@@ -876,7 +912,12 @@ export default function Page() {
 
       <div className="corner-left">© VIA Labs Pte Ltd</div>
       <div className="corner-right">
-        <a href="https://x.com/via_labs_sg" target="_blank" rel="noopener noreferrer" className="social-link">
+        <a
+          href="https://x.com/via_labs_sg"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="social-link"
+        >
           <img src={xIconSrc} className="social-icon" alt="X" />
         </a>
       </div>
